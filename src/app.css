@@ -20,6 +20,14 @@
 	--color-info: #5b9df9;
 	--color-info-muted: rgba(91, 157, 249, 0.12);
 
+	/* Badge-Farben für Spiele und Status */
+	--badge-heim-bg: #e8453c;
+	--badge-heim-text: #fff;
+	--badge-wettbewerb-bg: #f5a623;
+	--badge-wettbewerb-text: #000;
+	--badge-status-bg: #34d399;
+	--badge-status-text: #000;
+
 	/* Typografie */
 	--font-sans: 'Inter', system-ui, sans-serif;
 	--font-mono: 'JetBrains Mono', 'SF Mono', monospace;

@@ -39,7 +39,6 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     uuid id PK
     string name
     string email
-    string passwort_hash
   }
   ROLLEN {
     uuid id PK
@@ -52,6 +51,7 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
   DAUERKARTEN {
     uuid id PK
     uuid besitzer_id FK
+    string bezeichnung
     string block
     string reihe
     string platz
