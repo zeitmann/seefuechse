@@ -2,13 +2,13 @@
 	import Card from './Card.svelte';
 	import { ChevronRight, Clock } from '@lucide/svelte';
 
-	let { 
-		datum, 
-		heimAuswaerts, 
-		wettbewerb, 
-		gegner, 
-		uhrzeit, 
-		statusBadge 
+	let {
+		datum,
+		heimAuswaerts,
+		wettbewerb,
+		gegner,
+		uhrzeit = undefined,
+		statusBadge
 	} = $props();
 
 	// Datum parsen (erwartet: ISO-String oder Date-Objekt)
@@ -39,10 +39,12 @@
 				<span class="badge badge-wettbewerb">{wettbewerb.toUpperCase()}</span>
 			</div>
 			<h3 class="gegner">{gegner}</h3>
-			<div class="time-row">
-				<Clock size={16} />
-				<span>{uhrzeit} Uhr</span>
-			</div>
+			{#if uhrzeit}
+				<div class="time-row">
+					<Clock size={16} />
+					<span>{uhrzeit} Uhr</span>
+				</div>
+			{/if}
 		</div>
 
 		<div class="status-section">

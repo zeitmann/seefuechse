@@ -6,7 +6,7 @@
 	const navItems = [
 		{ label: 'Start', path: '/', icon: Home },
 		{ label: 'Spielplan', path: '/spielplan', icon: Calendar },
-		{ label: 'Karte', path: '/karte', icon: Ticket },
+		{ label: 'Dauerkarte', path: '/karte', icon: Ticket },
 		{ label: 'Verwaltung', path: '/verwaltung', icon: Shield }
 	];
 
