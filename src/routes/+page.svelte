@@ -223,6 +223,11 @@
 			<button class="icon-btn" aria-label="Menü">
 				<Menu size={20} />
 			</button>
+			<form method="POST" action="/logout" style="display:contents">
+				<button type="submit" class="icon-btn" aria-label="Abmelden">
+					<LogOut size={20} />
+				</button>
+			</form>
 		</div>
 	</header>
 

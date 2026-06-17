@@ -25,6 +25,7 @@ export const authUsers = authSchema.table('users', {
 	id: uuid('id').primaryKey()
 });
 
+export const mitgliedStatusEnum = pgEnum('mitglied_status', ['ausstehend', 'aktiv', 'abgelehnt']);
 export const heimAuswaertsEnum = pgEnum('heim_auswaerts', ['heim', 'auswaerts']);
 export const freigabeStatusEnum = pgEnum('freigabe_status', [
 	'offen',
@@ -47,7 +48,8 @@ export const mitglieder = pgTable('mitglieder', {
 		.primaryKey()
 		.references(() => authUsers.id, { onDelete: 'cascade' }),
 	name: text('name').notNull(),
-	email: text('email').notNull().unique()
+	email: text('email').notNull().unique(),
+	status: mitgliedStatusEnum('status').notNull().default('ausstehend')
 });
 
 export const mitgliedRollen = pgTable(

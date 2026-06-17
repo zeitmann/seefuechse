@@ -28,6 +28,7 @@
 	},
 	"dependencies": {
 		"@lucide/svelte": "^1.18.0",
+		"@supabase/ssr": "^0.12.0",
 		"@supabase/supabase-js": "^2.46.0",
 		"drizzle-orm": "^0.36.4",
 		"leaflet": "^1.9.4",

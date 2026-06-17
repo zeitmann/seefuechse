@@ -20,8 +20,10 @@
 		return { day, month };
 	}
 
-	const { day, month } = formatDate(datum);
-	const heimAuswaertsText = heimAuswaerts === 'heim' ? 'HEIM' : 'AUSWÄRTS';
+	const dateFormatted = $derived(formatDate(datum));
+	const day = $derived(dateFormatted.day);
+	const month = $derived(dateFormatted.month);
+	const heimAuswaertsText = $derived(heimAuswaerts === 'heim' ? 'HEIM' : 'AUSWÄRTS');
 </script>
 
 <Card>
