@@ -1,18 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { mitglieder, mitgliedRollen, rollen } from '$lib/server/db/schema';
+import { mitglieder } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { hatVerwaltungsRolle } from '$lib/server/rollen';
 import type { PageServerLoad, Actions } from './$types';
-
-async function hatVerwaltungsRolle(userId: string): Promise<boolean> {
-	const rows = await db
-		.select({ name: rollen.name })
-		.from(mitgliedRollen)
-		.innerJoin(rollen, eq(mitgliedRollen.rolleId, rollen.id))
-		.where(eq(mitgliedRollen.mitgliedId, userId));
-
-	return rows.some((r) => r.name === 'admin' || r.name === 'vorstand');
-}
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { user } = await locals.safeGetSession();

@@ -14,6 +14,6 @@
 <div class="container">
 	{@render children()}
 	{#if showNav}
-		<NavBar />
+		<NavBar hasDauerkarte={data.hasDauerkarte} kannVerwalten={data.kannVerwalten} />
 	{/if}
 </div>

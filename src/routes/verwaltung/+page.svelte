@@ -12,8 +12,15 @@
 	</header>
 
 	<main class="main-content">
-		<!-- Ausstehende Freischaltungen (nur für Admin/Vorstand) -->
-		{#if data.kannVerwalten}
+		{#if !data.kannVerwalten}
+			<Card>
+				<div class="no-access">
+					<span class="no-access-icon" aria-hidden="true">🔒</span>
+					<p>Kein Zugriff. Diese Seite ist nur für Vorstand und Admin sichtbar.</p>
+				</div>
+			</Card>
+		{:else}
+			<!-- Ausstehende Freischaltungen (nur für Admin/Vorstand) -->
 			<section class="section">
 				<div class="section-header">
 					<h2>Ausstehende Freischaltungen</h2>
@@ -55,15 +62,15 @@
 					</Card>
 				{/if}
 			</section>
-		{/if}
 
-		<!-- Dauerkarten-Zuordnung (folgt im nächsten Schritt) -->
-		<section class="section">
-			<div class="section-header">
-				<h2>Dauerkarten-Zuordnung</h2>
-			</div>
-			<p class="placeholder-text">Folgt im nächsten Schritt.</p>
-		</section>
+			<!-- Dauerkarten-Zuordnung (folgt im nächsten Schritt) -->
+			<section class="section">
+				<div class="section-header">
+					<h2>Dauerkarten-Zuordnung</h2>
+				</div>
+				<p class="placeholder-text">Folgt im nächsten Schritt.</p>
+			</section>
+		{/if}
 	</main>
 </div>
 
@@ -227,5 +234,21 @@
 		margin: 0;
 		font-size: 14px;
 		color: var(--color-text-muted);
+	}
+
+	.no-access {
+		text-align: center;
+		color: var(--color-text-muted);
+		font-size: 15px;
+	}
+
+	.no-access-icon {
+		display: block;
+		font-size: 28px;
+		margin-bottom: 8px;
+	}
+
+	.no-access p {
+		margin: 0;
 	}
 </style>

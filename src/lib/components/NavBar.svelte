@@ -1,14 +1,21 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Home, Calendar, Ticket, Shield } from '@lucide/svelte';
+	import { Home, Calendar, Ticket, Inbox, Shield } from '@lucide/svelte';
 
-	// Navigation items
-	const navItems = [
+	let {
+		hasDauerkarte = false,
+		kannVerwalten = false
+	}: { hasDauerkarte?: boolean; kannVerwalten?: boolean } = $props();
+
+	// Navigation items – abhängig von Dauerkarten-Besitz und Verwaltungsrolle
+	const navItems = $derived([
 		{ label: 'Start', path: '/', icon: Home },
 		{ label: 'Spielplan', path: '/spielplan', icon: Calendar },
-		{ label: 'Dauerkarte', path: '/karte', icon: Ticket },
-		{ label: 'Verwaltung', path: '/verwaltung', icon: Shield }
-	];
+		hasDauerkarte
+			? { label: 'Dauerkarte', path: '/karte', icon: Ticket }
+			: { label: 'Anfragen', path: '/anfragen', icon: Inbox },
+		...(kannVerwalten ? [{ label: 'Verwaltung', path: '/verwaltung', icon: Shield }] : [])
+	]);
 
 	// Check if a path is active
 	function isActive(path: string): boolean {

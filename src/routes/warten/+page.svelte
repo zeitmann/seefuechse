@@ -13,10 +13,7 @@
 			<h2 class="warten-heading">Freischaltung ausstehend</h2>
 			<p class="warten-text">
 				Deine Registrierung ist eingegangen. Ein Vorstandsmitglied prüft deinen Antrag und
-				schaltet dich frei – das dauert in der Regel wenige Stunden.
-			</p>
-			<p class="warten-text">
-				Sobald dein Konto aktiviert ist, kannst du dich ganz normal anmelden.
+				schaltet dich frei.
 			</p>
 
 			<form method="POST" action="/logout">

@@ -16,6 +16,17 @@ export const actions: Actions = {
 		});
 
 		if (error || !data.user) {
+			const istUnbestaetigt =
+				error?.code === 'email_not_confirmed' ||
+				/email not confirmed/i.test(error?.message ?? '');
+
+			if (istUnbestaetigt) {
+				return fail(400, {
+					fehler:
+						'Deine E-Mail-Adresse ist noch nicht bestätigt. Bitte prüfe dein Postfach (auch den Spam-Ordner) nach der Bestätigungs-Mail.'
+				});
+			}
+
 			return fail(400, { fehler: 'E-Mail oder Passwort falsch.' });
 		}
 
