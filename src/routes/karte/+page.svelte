@@ -43,7 +43,9 @@
 				{:else}
 					<div class="spiele-liste">
 						{#each data.spieleMitFreigabe as item (item.spiel.id)}
-							<FreigabeZeile spiel={item.spiel} freigabe={item.freigabe} />
+							<div id={item.freigabe ? `freigabe-${item.freigabe.id}` : undefined}>
+								<FreigabeZeile spiel={item.spiel} freigabe={item.freigabe} />
+							</div>
 						{/each}
 					</div>
 				{/if}

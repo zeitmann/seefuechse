@@ -61,7 +61,7 @@
 									</div>
 								</div>
 								<div class="application-badge">{freigabe.bewerbungen.length} Bewerbung{freigabe.bewerbungen.length !== 1 ? 'en' : ''}</div>
-								<button class="decide-btn">Entscheiden →</button>
+								<a href="/karte#freigabe-{freigabe.id}" class="decide-btn">Entscheiden →</a>
 							</div>
 						{/each}
 					</div>
@@ -78,13 +78,15 @@
 
 			<div class="matches-list">
 				{#each data.naechsteSpiele as spiel}
-					<MatchCard
-						datum={spiel.datum}
-						heimAuswaerts={spiel.heimAuswaerts}
-						wettbewerb={spiel.wettbewerb}
-						gegner={spiel.gegner}
-						statusBadge={spiel.freeCount > 0 ? `${spiel.freeCount} frei` : undefined}
-					/>
+					<a href="/spielplan/{spiel.id}" style="display:contents">
+						<MatchCard
+							datum={spiel.datum}
+							heimAuswaerts={spiel.heimAuswaerts}
+							wettbewerb={spiel.wettbewerb}
+							gegner={spiel.gegner}
+							statusBadge={spiel.freeCount > 0 ? `${spiel.freeCount} frei` : undefined}
+						/>
+					</a>
 				{/each}
 			</div>
 		</section>
@@ -242,11 +244,13 @@
 	}
 
 	.decide-btn {
+		display: inline-block;
 		background: none;
 		border: none;
 		color: var(--color-text);
 		font-size: 14px;
 		font-weight: 600;
+		text-decoration: none;
 		cursor: pointer;
 		padding: 6px 0;
 		white-space: nowrap;
