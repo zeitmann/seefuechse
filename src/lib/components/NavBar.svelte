@@ -7,13 +7,13 @@
 		kannVerwalten = false
 	}: { hasDauerkarte?: boolean; kannVerwalten?: boolean } = $props();
 
-	// Navigation items – abhängig von Dauerkarten-Besitz und Verwaltungsrolle
+	// Navigation items – "Anfragen" immer sichtbar, "Dauerkarte" zusätzlich bei Besitz,
+	// "Verwaltung" nur mit Verwaltungsrolle
 	const navItems = $derived([
 		{ label: 'Start', path: '/', icon: Home },
 		{ label: 'Spielplan', path: '/spielplan', icon: Calendar },
-		hasDauerkarte
-			? { label: 'Dauerkarte', path: '/karte', icon: Ticket }
-			: { label: 'Anfragen', path: '/anfragen', icon: Inbox },
+		{ label: 'Anfragen', path: '/anfragen', icon: Inbox },
+		...(hasDauerkarte ? [{ label: 'Dauerkarte', path: '/karte', icon: Ticket }] : []),
 		...(kannVerwalten ? [{ label: 'Verwaltung', path: '/verwaltung', icon: Shield }] : [])
 	]);
 
@@ -24,7 +24,7 @@
 </script>
 
 <nav class="navbar">
-	<div class="navbar-content">
+	<div class="navbar-content" class:compact={navItems.length >= 5}>
 		{#each navItems as item}
 			<a href={item.path} class="nav-item" class:active={isActive(item.path)}>
 				<svelte:component this={item.icon} size={24} />
@@ -93,6 +93,17 @@
 
 		.nav-label {
 			font-size: 10px;
+		}
+
+		/* Bis zu 5 Tabs gleichzeitig – Labels etwas schmaler, damit sie
+		   auf einem 375px-Viewport nicht kollidieren */
+		.navbar-content.compact {
+			padding: 0 8px;
+		}
+
+		.navbar-content.compact .nav-label {
+			font-size: 9px;
+			letter-spacing: -0.2px;
 		}
 	}
 </style>

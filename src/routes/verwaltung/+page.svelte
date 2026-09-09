@@ -70,6 +70,15 @@
 				</div>
 				<p class="placeholder-text">Folgt im nächsten Schritt.</p>
 			</section>
+
+			{#if data.istAdmin}
+				<section class="section">
+					<div class="section-header">
+						<h2>Administration</h2>
+					</div>
+					<a class="rollen-link" href="/verwaltung/rollen">Rollen verwalten</a>
+				</section>
+			{/if}
 		{/if}
 	</main>
 </div>
@@ -234,6 +243,27 @@
 		margin: 0;
 		font-size: 14px;
 		color: var(--color-text-muted);
+	}
+
+	.rollen-link {
+		display: inline-flex;
+		align-items: center;
+		padding: 10px 16px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+		color: var(--color-text);
+		font-size: 14px;
+		font-weight: 600;
+		text-decoration: none;
+		transition:
+			border-color 0.15s,
+			color 0.15s;
+	}
+
+	.rollen-link:hover {
+		border-color: var(--color-text-muted);
+		color: var(--color-accent);
 	}
 
 	.no-access {

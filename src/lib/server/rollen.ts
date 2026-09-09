@@ -14,3 +14,16 @@ export async function hatVerwaltungsRolle(userId: string): Promise<boolean> {
 
 	return rows.some((r) => r.name === 'admin' || r.name === 'vorstand');
 }
+
+/**
+ * Prüft, ob das Mitglied konkret die Rolle 'admin' besitzt (nicht 'vorstand').
+ */
+export async function hatAdminRolle(userId: string): Promise<boolean> {
+	const rows = await db
+		.select({ name: rollen.name })
+		.from(mitgliedRollen)
+		.innerJoin(rollen, eq(mitgliedRollen.rolleId, rollen.id))
+		.where(eq(mitgliedRollen.mitgliedId, userId));
+
+	return rows.some((r) => r.name === 'admin');
+}

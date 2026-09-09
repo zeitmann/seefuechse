@@ -2,7 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { redirect, type Handle } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
-const PUBLIC_ROUTES = ['/login', '/registrieren'];
+// '/passwort-aendern' ist testweise öffentlich: Der Reset-Link aus der
+// Supabase-Mail wird ohne reguläre Session aufgerufen – die Recovery-Session
+// entsteht erst clientseitig aus dem URL-Fragment.
+const PUBLIC_ROUTES = ['/login', '/registrieren', '/passwort-aendern'];
 const WARTE_ROUTE = '/warten';
 
 export const handle: Handle = async ({ event, resolve }) => {
