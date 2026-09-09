@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Card from '$lib/components/Card.svelte';
+	import Header from '$lib/components/Header.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 </script>
 
 <div class="page-container">
+	<Header />
+
 	<header class="page-header">
 		<h1>Verwaltung</h1>
 	</header>

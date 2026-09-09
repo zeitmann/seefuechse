@@ -25,6 +25,12 @@
 		const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 		return months[new Date(dateStr).getMonth()];
 	}
+
+	const STATUS_LABEL: Record<string, string> = {
+		offen: 'Offen',
+		vergeben: 'Vergeben',
+		zurueckgezogen: 'Zurückgezogen'
+	};
 </script>
 
 <div class="page-container">
@@ -58,6 +64,33 @@
 				<h3 class="section-title">Deine Dauerkarte für dieses Spiel</h3>
 				<FreigabeZeile spiel={data.spiel} freigabe={data.freigabe} />
 			</section>
+		{/if}
+
+		<!-- Dauerkarten-Freigaben – für alle Mitglieder sichtbar -->
+		{#if data.freigabenFuerSpiel.length > 0}
+			<section class="freigabe-section">
+				<h3 class="section-title">Dauerkarten-Freigaben</h3>
+				<div class="freigaben-liste">
+					{#each data.freigabenFuerSpiel as freigabe (freigabe.id)}
+						<Card>
+							<div class="freigabe-item">
+								<div class="freigabe-info">
+									<p class="freigabe-besitzer">{freigabe.besitzerName}</p>
+									<p class="freigabe-karte">{freigabe.kartenBezeichnung}</p>
+									{#if freigabe.status === 'vergeben' && freigabe.empfaengerName}
+										<p class="freigabe-empfaenger">an {freigabe.empfaengerName}</p>
+									{/if}
+								</div>
+								<span class="status-badge status-{freigabe.status}">
+									{STATUS_LABEL[freigabe.status] ?? freigabe.status}
+								</span>
+							</div>
+						</Card>
+					{/each}
+				</div>
+			</section>
+		{:else}
+			<p class="freigaben-leer">Keine Freigaben für dieses Spiel</p>
 		{/if}
 	</main>
 </div>
@@ -166,5 +199,75 @@
 		margin: 0 0 12px;
 		font-size: 16px;
 		font-weight: 600;
+	}
+
+	/* DAUERKARTEN-FREIGABEN */
+	.freigaben-liste {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.freigabe-item {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+	}
+
+	.freigabe-info {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.freigabe-besitzer {
+		margin: 0;
+		font-size: 15px;
+		font-weight: 600;
+	}
+
+	.freigabe-karte {
+		margin: 3px 0 0;
+		font-size: 12px;
+		color: var(--color-text-muted);
+	}
+
+	.freigabe-empfaenger {
+		margin: 4px 0 0;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--color-success);
+	}
+
+	.status-badge {
+		display: inline-block;
+		padding: 4px 8px;
+		border-radius: 6px;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.5px;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.status-offen {
+		background: var(--color-info-muted);
+		color: var(--color-info);
+	}
+
+	.status-vergeben {
+		background: var(--color-success-muted);
+		color: var(--color-success);
+	}
+
+	.status-zurueckgezogen {
+		background: var(--color-warning-muted);
+		color: var(--color-warning);
+	}
+
+	.freigaben-leer {
+		margin: 0;
+		font-size: 13px;
+		color: var(--color-text-muted);
 	}
 </style>
