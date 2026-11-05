@@ -44,7 +44,11 @@
 					<div class="spiele-liste">
 						{#each data.spieleMitFreigabe as item (item.spiel.id)}
 							<div id={item.freigabe ? `freigabe-${item.freigabe.id}` : undefined}>
-								<FreigabeZeile spiel={item.spiel} freigabe={item.freigabe} />
+								<FreigabeZeile
+									spiel={item.spiel}
+									freigabe={item.freigabe}
+									interesseAnzahl={item.interesseAnzahl}
+								/>
 							</div>
 						{/each}
 					</div>

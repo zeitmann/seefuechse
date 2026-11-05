@@ -11,7 +11,8 @@ import {
 	text,
 	date,
 	timestamp,
-	primaryKey
+	primaryKey,
+	unique
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -102,24 +103,55 @@ export const freigaben = pgTable('freigaben', {
 	vergebenAn: uuid('vergeben_an').references(() => mitglieder.id, { onDelete: 'set null' })
 });
 
-export const bewerbungen = pgTable('bewerbungen', {
-	id: uuid('id').defaultRandom().primaryKey(),
-	freigabeId: uuid('freigabe_id')
-		.notNull()
-		.references(() => freigaben.id, { onDelete: 'cascade' }),
-	mitgliedId: uuid('mitglied_id')
-		.notNull()
-		.references(() => mitglieder.id, { onDelete: 'cascade' }),
-	status: bewerbungStatusEnum('status').notNull().default('angefragt'),
-	erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow()
-});
+export const bewerbungen = pgTable(
+	'bewerbungen',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		freigabeId: uuid('freigabe_id')
+			.notNull()
+			.references(() => freigaben.id, { onDelete: 'cascade' }),
+		mitgliedId: uuid('mitglied_id')
+			.notNull()
+			.references(() => mitglieder.id, { onDelete: 'cascade' }),
+		status: bewerbungStatusEnum('status').notNull().default('angefragt'),
+		erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow()
+	},
+	(table) => ({
+		// Ein Mitglied kann sich pro Freigabe nur einmal bewerben.
+		freigabeMitgliedUnique: unique().on(table.freigabeId, table.mitgliedId)
+	})
+);
+
+/**
+ * Interessensbekundung eines Mitglieds für ein Spiel – unabhängig von einer
+ * konkreten Freigabe/Bewerbung. Ermöglicht eine "Warteliste" für Spiele, für
+ * die (noch) keine Dauerkarte freigegeben wurde.
+ */
+export const interesse = pgTable(
+	'interesse',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		mitgliedId: uuid('mitglied_id')
+			.notNull()
+			.references(() => mitglieder.id, { onDelete: 'cascade' }),
+		spielId: uuid('spiel_id')
+			.notNull()
+			.references(() => spiele.id, { onDelete: 'cascade' }),
+		erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow()
+	},
+	(table) => ({
+		// Ein Mitglied kann pro Spiel nur einmal Interesse anmelden.
+		mitgliedSpielUnique: unique().on(table.mitgliedId, table.spielId)
+	})
+);
 
 // --- Relations: ermöglichen komfortable Queries mit db.query.x.findMany({ with: {...} }) ---
 
 export const mitgliederRelations = relations(mitglieder, ({ many }) => ({
 	rollenZuordnungen: many(mitgliedRollen),
 	dauerkarten: many(dauerkarten),
-	bewerbungen: many(bewerbungen)
+	bewerbungen: many(bewerbungen),
+	interesse: many(interesse)
 }));
 
 export const rollenRelations = relations(rollen, ({ many }) => ({
@@ -146,7 +178,8 @@ export const dauerkartenRelations = relations(dauerkarten, ({ one, many }) => ({
 }));
 
 export const spieleRelations = relations(spiele, ({ many }) => ({
-	freigaben: many(freigaben)
+	freigaben: many(freigaben),
+	interesse: many(interesse)
 }));
 
 export const freigabenRelations = relations(freigaben, ({ one, many }) => ({
@@ -173,5 +206,16 @@ export const bewerbungenRelations = relations(bewerbungen, ({ one }) => ({
 	mitglied: one(mitglieder, {
 		fields: [bewerbungen.mitgliedId],
 		references: [mitglieder.id]
+	})
+}));
+
+export const interesseRelations = relations(interesse, ({ one }) => ({
+	mitglied: one(mitglieder, {
+		fields: [interesse.mitgliedId],
+		references: [mitglieder.id]
+	}),
+	spiel: one(spiele, {
+		fields: [interesse.spielId],
+		references: [spiele.id]
 	})
 }));

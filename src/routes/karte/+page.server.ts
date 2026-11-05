@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { dauerkarten, spiele as spieleTable, freigaben } from '$lib/server/db/schema';
-import { eq, gte, asc } from 'drizzle-orm';
+import { dauerkarten, spiele as spieleTable, freigaben, interesse } from '$lib/server/db/schema';
+import { eq, gte, asc, count, inArray } from 'drizzle-orm';
 import { toggleFreigabe, vergebenAn } from '$lib/server/freigaben';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -35,9 +35,21 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	});
 
+	// Anzahl angemeldeter Interessenten je Spiel – eine gruppierte COUNT-Abfrage
+	// für alle kommenden Spiele statt N+1-Einzelabfragen. Rein informativ.
+	const spielIds = kommendeSpiele.map((s) => s.id);
+	const interesseCounts = spielIds.length
+		? await db
+				.select({ spielId: interesse.spielId, anzahl: count() })
+				.from(interesse)
+				.where(inArray(interesse.spielId, spielIds))
+				.groupBy(interesse.spielId)
+		: [];
+	const interesseProSpiel = new Map(interesseCounts.map((r) => [r.spielId, r.anzahl]));
+
 	const spieleMitFreigabe = kommendeSpiele.map((spiel) => {
 		const freigabe = meineFreigaben.find((f) => f.spielId === spiel.id) ?? null;
-		return { spiel, freigabe };
+		return { spiel, freigabe, interesseAnzahl: interesseProSpiel.get(spiel.id) ?? 0 };
 	});
 
 	const freigegebenCount = meineFreigaben.filter((f) => f.status === 'offen').length;

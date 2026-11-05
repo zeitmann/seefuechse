@@ -20,7 +20,17 @@
 		vergebenAnMitglied: { name: string } | null;
 	} | null;
 
-	let { spiel, freigabe }: { spiel: SpielProp; freigabe: FreigabeProp } = $props();
+	let {
+		spiel,
+		freigabe,
+		interesseAnzahl = 0,
+		zeigeBewerber = true
+	}: {
+		spiel: SpielProp;
+		freigabe: FreigabeProp;
+		interesseAnzahl?: number;
+		zeigeBewerber?: boolean;
+	} = $props();
 
 	const istVergeben = $derived(freigabe?.status === 'vergeben');
 	const istFreigegeben = $derived(freigabe?.status === 'offen');
@@ -62,12 +72,20 @@
 			</form>
 		</div>
 
+		<!-- Interesse-Hinweis für den DK-Besitzer, unabhängig vom Freigabe-Status -->
+		{#if interesseAnzahl > 0}
+			<p class="interesse-hinweis">
+				{interesseAnzahl}
+				{interesseAnzahl === 1 ? 'Mitglied hat' : 'Mitglieder haben'} Interesse angemeldet
+			</p>
+		{/if}
+
 		<!-- Zusatz-Bereich je nach Status -->
 		{#if istVergeben}
 			<p class="status-vergeben">
 				Vergeben an {freigabe?.vergebenAnMitglied?.name ?? '—'}
 			</p>
-		{:else if istFreigegeben && freigabe && freigabe.bewerbungen.length > 0}
+		{:else if zeigeBewerber && istFreigegeben && freigabe && freigabe.bewerbungen.length > 0}
 			<div class="bewerber-liste">
 				{#each freigabe.bewerbungen as bewerbung (bewerbung.mitgliedId)}
 					<form method="POST" action="?/vergeben" use:enhance>
@@ -80,6 +98,11 @@
 					</form>
 				{/each}
 			</div>
+		{:else if istFreigegeben && freigabe && freigabe.bewerbungen.length > 0}
+			<p class="status-warten">
+				Freigegeben – {freigabe.bewerbungen.length}
+				{freigabe.bewerbungen.length === 1 ? 'Anfrage' : 'Anfragen'}
+			</p>
 		{:else if istFreigegeben}
 			<p class="status-warten">Freigegeben – wartet auf Anfragen.</p>
 		{/if}
@@ -194,6 +217,12 @@
 	.status-warten {
 		margin: 0;
 		font-size: 13px;
+		color: var(--color-text-muted);
+	}
+
+	.interesse-hinweis {
+		margin: 0;
+		font-size: 12px;
 		color: var(--color-text-muted);
 	}
 
