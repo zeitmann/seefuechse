@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Card from './Card.svelte';
+	import { mitNeuladenBeiFehler } from '$lib/enhance';
 
 	type SpielProp = {
 		id: string;
@@ -88,7 +89,7 @@
 		{:else if zeigeBewerber && istFreigegeben && freigabe && freigabe.bewerbungen.length > 0}
 			<div class="bewerber-liste">
 				{#each freigabe.bewerbungen as bewerbung (bewerbung.mitgliedId)}
-					<form method="POST" action="?/vergeben" use:enhance>
+					<form method="POST" action="?/vergeben" use:enhance={mitNeuladenBeiFehler}>
 						<input type="hidden" name="freigabeId" value={freigabe.id} />
 						<input type="hidden" name="mitgliedId" value={bewerbung.mitgliedId} />
 						<div class="bewerber-row">

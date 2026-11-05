@@ -2,9 +2,11 @@
 	import { enhance } from '$app/forms';
 	import Header from '$lib/components/Header.svelte';
 	import Card from '$lib/components/Card.svelte';
-	import type { PageData } from './$types';
+	import FehlerHinweis from '$lib/components/FehlerHinweis.svelte';
+	import { mitNeuladenBeiFehler } from '$lib/enhance';
+	import type { PageData, ActionData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const STATUS_LABEL: Record<string, string> = {
 		angefragt: 'Angefragt',
@@ -31,6 +33,7 @@
 
 	<main class="main-content">
 		<h1>Meine Anfragen</h1>
+		<FehlerHinweis nachricht={form?.fehler} />
 
 		<!-- 1. Interesse-Anmeldungen -->
 		<section class="section">
@@ -125,7 +128,7 @@
 												<span class="bewerber-status">({bewerber.status})</span>
 											</span>
 											{#if bewerber.status === 'angefragt'}
-												<form method="POST" action="?/vergeben" use:enhance>
+												<form method="POST" action="?/vergeben" use:enhance={mitNeuladenBeiFehler}>
 													<input type="hidden" name="freigabeId" value={freigabe.id} />
 													<input type="hidden" name="bewerbungId" value={bewerber.id} />
 													<button

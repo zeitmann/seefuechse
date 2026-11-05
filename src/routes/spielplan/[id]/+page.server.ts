@@ -9,10 +9,11 @@ import {
 } from '$lib/server/db/schema';
 import { eq, and, ne, sql } from 'drizzle-orm';
 import { toggleFreigabe, vergebenAn, vergebenAnMitInteresse } from '$lib/server/freigaben';
-import { toggleInteresse } from '$lib/server/interesse';
+import { interesseAnmelden, interesseZurueckziehen } from '$lib/server/interesse';
 import { bewerbungZurueckziehen } from '$lib/server/bewerbungen';
 import { istUniqueViolation } from '$lib/server/db/errors';
 import { hatAdminRolle } from '$lib/server/rollen';
+import { alsAktionsFehler } from '$lib/server/aktionen';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -171,17 +172,21 @@ export const actions: Actions = {
 		const bewerbungId = String(form.get('bewerbungId') ?? '');
 		if (!freigabeId || !bewerbungId) error(400, 'Fehlende Daten');
 
-		// bewerbungId -> mitgliedId auflösen; die Bewerbung muss zur angegebenen
-		// Freigabe gehören.
-		const bewerbung = await db.query.bewerbungen.findFirst({
-			where: and(eq(bewerbungen.id, bewerbungId), eq(bewerbungen.freigabeId, freigabeId))
-		});
-		if (!bewerbung) error(404, 'Bewerbung nicht gefunden');
+		try {
+			// bewerbungId -> mitgliedId auflösen; die Bewerbung muss zur angegebenen
+			// Freigabe gehören.
+			const bewerbung = await db.query.bewerbungen.findFirst({
+				where: and(eq(bewerbungen.id, bewerbungId), eq(bewerbungen.freigabeId, freigabeId))
+			});
+			if (!bewerbung) error(404, 'Diese Bewerbung existiert nicht mehr.');
 
-		// Gemeinsame Vergabe-Logik (auch von /karte genutzt): prüft serverseitig
-		// den Dauerkarten-Besitzer und nutzt bedingte WHERE-Klauseln als
-		// Race-Condition-Schutz (kein Read-then-Write).
-		await vergebenAn(user.id, freigabeId, bewerbung.mitgliedId);
+			// Gemeinsame Vergabe-Logik (auch von /karte genutzt): prüft serverseitig
+			// den Dauerkarten-Besitzer und nutzt bedingte WHERE-Klauseln als
+			// Race-Condition-Schutz (kein Read-then-Write).
+			await vergebenAn(user.id, freigabeId, bewerbung.mitgliedId);
+		} catch (e) {
+			return alsAktionsFehler(e);
+		}
 	},
 
 	vergebenAusInteresse: async ({ params, request, locals }) => {
@@ -195,13 +200,27 @@ export const actions: Actions = {
 
 		// Dritter Einstiegspunkt zur Vergabe – legt Freigabe/Bewerbung bei Bedarf
 		// an, gesamte Autorisierung + Race-Schutz in vergebenAnMitInteresse.
-		await vergebenAnMitInteresse(user.id, dauerkarteId, params.id, mitgliedId);
+		try {
+			await vergebenAnMitInteresse(user.id, dauerkarteId, params.id, mitgliedId);
+		} catch (e) {
+			return alsAktionsFehler(e);
+		}
 	},
 
-	toggleInteresse: async ({ params, locals }) => {
+	interesseAnmelden: async ({ params, locals }) => {
 		const { user } = await locals.safeGetSession();
 		if (!user) error(403, 'Nicht angemeldet');
-		await toggleInteresse(user.id, params.id);
+		try {
+			await interesseAnmelden(user.id, params.id);
+		} catch (e) {
+			return alsAktionsFehler(e);
+		}
+	},
+
+	interesseZurueckziehen: async ({ params, locals }) => {
+		const { user } = await locals.safeGetSession();
+		if (!user) error(403, 'Nicht angemeldet');
+		await interesseZurueckziehen(user.id, params.id);
 	},
 
 	bewerben: async ({ request, locals }) => {

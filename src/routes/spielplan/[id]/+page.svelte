@@ -3,9 +3,11 @@
 	import Header from '$lib/components/Header.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import FreigabeZeile from '$lib/components/FreigabeZeile.svelte';
-	import type { PageData } from './$types';
+	import FehlerHinweis from '$lib/components/FehlerHinweis.svelte';
+	import { mitNeuladenBeiFehler } from '$lib/enhance';
+	import type { PageData, ActionData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const heimAuswaertsText = $derived(data.spiel.heimAuswaerts === 'heim' ? 'HEIM' : 'AUSWÄRTS');
 
@@ -40,6 +42,8 @@
 	<main class="main-content">
 		<!-- Zurück-Link -->
 		<a href="/spielplan" class="back-link">← Spielplan</a>
+
+		<FehlerHinweis nachricht={form?.fehler} />
 
 		<!-- Spiel-Hero -->
 		<Card>
@@ -85,7 +89,11 @@
 							eine Dauerkarte freigegeben wurde.
 						</p>
 					</div>
-					<form method="POST" action="?/toggleInteresse" use:enhance>
+					<form
+						method="POST"
+						action={data.hatInteresseAngemeldet ? '?/interesseZurueckziehen' : '?/interesseAnmelden'}
+						use:enhance={mitNeuladenBeiFehler}
+					>
 						<button
 							type="button"
 							class="btn-interesse"
@@ -111,7 +119,7 @@
 							<div class="interessent-zeile">
 								<span class="interessent-name">{person.name}</span>
 								{#if person.kannVergeben}
-									<form method="POST" action="?/vergebenAusInteresse" use:enhance>
+									<form method="POST" action="?/vergebenAusInteresse" use:enhance={mitNeuladenBeiFehler}>
 										<input type="hidden" name="dauerkarteId" value={data.eigeneDauerkarteId} />
 										<input type="hidden" name="mitgliedId" value={person.mitgliedId} />
 										<button
@@ -184,7 +192,7 @@
 												<span class="bewerber-status">({bewerber.status})</span>
 											</span>
 											{#if freigabe.istBesitzer && freigabe.status === 'offen' && bewerber.status === 'angefragt'}
-												<form method="POST" action="?/vergeben" use:enhance>
+												<form method="POST" action="?/vergeben" use:enhance={mitNeuladenBeiFehler}>
 													<input type="hidden" name="freigabeId" value={freigabe.id} />
 													<input type="hidden" name="bewerbungId" value={bewerber.id} />
 													<button

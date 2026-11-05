@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { dauerkarten, spiele as spieleTable, freigaben, interesse } from '$lib/server/db/schema';
 import { eq, gte, asc, count, inArray } from 'drizzle-orm';
 import { toggleFreigabe, vergebenAn } from '$lib/server/freigaben';
+import { alsAktionsFehler } from '$lib/server/aktionen';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -83,6 +84,10 @@ export const actions: Actions = {
 		const mitgliedId = String(form.get('mitgliedId') ?? '');
 		if (!freigabeId || !mitgliedId) error(400, 'Fehlende Daten');
 
-		await vergebenAn(user.id, freigabeId, mitgliedId);
+		try {
+			await vergebenAn(user.id, freigabeId, mitgliedId);
+		} catch (e) {
+			return alsAktionsFehler(e);
+		}
 	}
 };

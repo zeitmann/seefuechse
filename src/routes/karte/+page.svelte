@@ -2,15 +2,17 @@
 	import Header from '$lib/components/Header.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import FreigabeZeile from '$lib/components/FreigabeZeile.svelte';
-	import type { PageData } from './$types';
+	import FehlerHinweis from '$lib/components/FehlerHinweis.svelte';
+	import type { PageData, ActionData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
 
 <div class="page-container">
 	<Header />
 
 	<main class="main-content">
+		<FehlerHinweis nachricht={form?.fehler} />
 		{#if !data.hasDauerkarte}
 			<div class="no-card">
 				<p>Du besitzt keine eigene Dauerkarte.</p>

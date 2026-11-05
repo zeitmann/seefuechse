@@ -3,8 +3,9 @@ import { db } from '$lib/server/db';
 import { dauerkarten, freigaben, bewerbungen, interesse } from '$lib/server/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { vergebenAn } from '$lib/server/freigaben';
-import { toggleInteresse } from '$lib/server/interesse';
+import { interesseZurueckziehen } from '$lib/server/interesse';
 import { bewerbungZurueckziehen } from '$lib/server/bewerbungen';
+import { alsAktionsFehler } from '$lib/server/aktionen';
 import type { PageServerLoad, Actions } from './$types';
 
 type MeinInteresse = {
@@ -141,7 +142,7 @@ export const actions: Actions = {
 		const spielId = String(form.get('spielId') ?? '');
 		if (!spielId) error(400, 'Fehlende Spiel-ID');
 
-		await toggleInteresse(user.id, spielId);
+		await interesseZurueckziehen(user.id, spielId);
 	},
 
 	bewerbungZurueckziehen: async ({ request, locals }) => {
@@ -167,11 +168,15 @@ export const actions: Actions = {
 		// bewerbungId -> mitgliedId auflösen; die Bewerbung muss zur angegebenen
 		// Freigabe gehören. Danach dieselbe gemeinsame Vergabe-Logik wie auf
 		// /spielplan/[id] und /karte (Autorisierung + Race-Schutz in vergebenAn).
-		const bewerbung = await db.query.bewerbungen.findFirst({
-			where: and(eq(bewerbungen.id, bewerbungId), eq(bewerbungen.freigabeId, freigabeId))
-		});
-		if (!bewerbung) error(404, 'Bewerbung nicht gefunden');
+		try {
+			const bewerbung = await db.query.bewerbungen.findFirst({
+				where: and(eq(bewerbungen.id, bewerbungId), eq(bewerbungen.freigabeId, freigabeId))
+			});
+			if (!bewerbung) error(404, 'Diese Bewerbung existiert nicht mehr.');
 
-		await vergebenAn(user.id, freigabeId, bewerbung.mitgliedId);
+			await vergebenAn(user.id, freigabeId, bewerbung.mitgliedId);
+		} catch (e) {
+			return alsAktionsFehler(e);
+		}
 	}
 };
