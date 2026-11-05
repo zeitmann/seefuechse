@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8" />
+		<title>Seefüchse – Icons erzeugen</title>
+		<style>
+			body {
+				font-family: system-ui, sans-serif;
+				background: #222;
+				color: #eee;
+				padding: 24px;
+			}
+			.icon {
+				display: inline-block;
+				margin: 0 24px 24px 0;
+				vertical-align: top;
+				text-align: center;
+			}
+			canvas {
+				display: block;
+				width: 192px;
+				height: 192px;
+				margin-bottom: 8px;
+				border: 1px solid #444;
+			}
+			a {
+				color: #8cf;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Seefüchse – Platzhalter-Icons</h1>
+		<p>
+			Temporäres Werkzeug: zeichnet 🦊 auf #0c0d10. Dateien herunterladen und nach
+			<code>static/icons/</code> bzw. <code>static/apple-touch-icon.png</code> legen.
+		</p>
+		<div id="icons"></div>
+		<script>
+			// Hintergrundfarbe = --color-bg aus src/app.css
+			const BG = '#0c0d10';
+			const EMOJI = '🦊';
+
+			// anteil = Anteil der Kantenlänge, den das Emoji einnimmt
+			const ICONS = [
+				{ name: 'icon-192.png', size: 192, anteil: 0.8 },
+				{ name: 'icon-512.png', size: 512, anteil: 0.8 },
+				{ name: 'apple-touch-icon.png', size: 180, anteil: 0.8 },
+				// Maskable: Emoji nur ca. 60 % (Safe Zone), Hintergrund vollflächig
+				{ name: 'icon-512-maskable.png', size: 512, anteil: 0.6 }
+			];
+
+			const container = document.getElementById('icons');
+
+			for (const icon of ICONS) {
+				const canvas = document.createElement('canvas');
+				canvas.width = icon.size;
+				canvas.height = icon.size;
+				const ctx = canvas.getContext('2d');
+
+				ctx.fillStyle = BG;
+				ctx.fillRect(0, 0, icon.size, icon.size);
+
+				// Schriftgröße so wählen, dass die gemessene Emoji-Breite dem Anteil entspricht
+				const ziel = icon.size * icon.anteil;
+				const font = (px) =>
+					`${px}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+				ctx.font = font(100);
+				const breite100 = ctx.measureText(EMOJI).width || 100;
+				const px = (100 * ziel) / breite100;
+				ctx.font = font(px);
+
+				// Exakt zentrieren über die tatsächliche Glyphen-Box
+				const m = ctx.measureText(EMOJI);
+				const x = (icon.size - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft)) / 2 +
+					m.actualBoundingBoxLeft;
+				const y = (icon.size - (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent)) / 2 +
+					m.actualBoundingBoxAscent;
+				ctx.textAlign = 'left';
+				ctx.textBaseline = 'alphabetic';
+				ctx.fillText(EMOJI, x, y);
+
+				const url = canvas.toDataURL('image/png');
+				const wrap = document.createElement('div');
+				wrap.className = 'icon';
+				const link = document.createElement('a');
+				link.href = url;
+				link.download = icon.name;
+				link.textContent = `${icon.name} (${icon.size}×${icon.size})`;
+				// Für automatisierten Export (headless Chrome --dump-dom)
+				link.dataset.png = url;
+				wrap.append(canvas, link);
+				container.append(wrap);
+			}
+		</script>
+	</body>
+</html>
