@@ -67,7 +67,12 @@
 		{#if data.hasDauerkarte}
 			<section class="freigabe-section">
 				<h3 class="section-title">Deine Dauerkarte für dieses Spiel</h3>
-				<FreigabeZeile spiel={data.spiel} freigabe={data.freigabe} zeigeBewerber={false} />
+				<FreigabeZeile
+					spiel={data.spiel}
+					freigabe={data.freigabe}
+					zeigeBewerber={false}
+					toggleBeschriftung="Dauerkarte freigeben"
+				/>
 			</section>
 		{/if}
 

@@ -25,12 +25,14 @@
 		spiel,
 		freigabe,
 		interesseAnzahl = 0,
-		zeigeBewerber = true
+		zeigeBewerber = true,
+		toggleBeschriftung
 	}: {
 		spiel: SpielProp;
 		freigabe: FreigabeProp;
 		interesseAnzahl?: number;
 		zeigeBewerber?: boolean;
+		toggleBeschriftung?: string;
 	} = $props();
 
 	const istVergeben = $derived(freigabe?.status === 'vergeben');
@@ -58,19 +60,24 @@
 				<p class="spiel-datum">{formatDatum(spiel.datum)}</p>
 			</div>
 
-			<form method="POST" action="?/toggleFreigabe" use:enhance>
-				<input type="hidden" name="spielId" value={spiel.id} />
-				<button
-					type="button"
-					class="toggle"
-					class:on={istFreigegeben || istVergeben}
-					disabled={istVergeben}
-					aria-label={istFreigegeben ? 'Freigabe zurückziehen' : 'Freigeben'}
-					onclick={(e) => e.currentTarget.closest('form')?.requestSubmit()}
-				>
-					<span class="toggle-thumb"></span>
-				</button>
-			</form>
+			<div class="toggle-gruppe">
+				<form method="POST" action="?/toggleFreigabe" use:enhance>
+					<input type="hidden" name="spielId" value={spiel.id} />
+					<button
+						type="button"
+						class="toggle"
+						class:on={istFreigegeben || istVergeben}
+						disabled={istVergeben}
+						aria-label={istFreigegeben ? 'Freigabe zurückziehen' : 'Freigeben'}
+						onclick={(e) => e.currentTarget.closest('form')?.requestSubmit()}
+					>
+						<span class="toggle-thumb"></span>
+					</button>
+				</form>
+				{#if toggleBeschriftung}
+					<span class="toggle-beschriftung">{toggleBeschriftung}</span>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Interesse-Hinweis für den DK-Besitzer, unabhängig vom Freigabe-Status -->
@@ -169,6 +176,18 @@
 	}
 
 	/* TOGGLE */
+	.toggle-gruppe {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.toggle-beschriftung {
+		font-size: 11px;
+		color: var(--color-text-muted);
+	}
+
 	.toggle {
 		width: 48px;
 		height: 28px;
