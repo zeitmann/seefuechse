@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Bell, LogOut, Menu } from '@lucide/svelte';
+	import { Bell, LogOut } from '@lucide/svelte';
 </script>
 
 <header class="header">
@@ -10,9 +10,6 @@
 	<div class="header-right">
 		<button class="icon-btn" aria-label="Benachrichtigungen">
 			<Bell size={20} />
-		</button>
-		<button class="icon-btn" aria-label="Menü">
-			<Menu size={20} />
 		</button>
 		<form method="POST" action="/logout" style="display:contents">
 			<button type="submit" class="icon-btn" aria-label="Abmelden">
