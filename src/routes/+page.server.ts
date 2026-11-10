@@ -1,6 +1,10 @@
 import { db } from '$lib/server/db';
 import { mitglieder, spiele, freigaben } from '$lib/server/db/schema';
 import { eq, gte, asc } from 'drizzle-orm';
+import {
+	ermittleTerminierungsStichtag,
+	mitUhrzeitVorlaeufig
+} from '$lib/server/spielplanTermine';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -27,12 +31,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const heute = new Date().toISOString().slice(0, 10);
 
-	const naechsteSpieleRaw = await db.query.spiele.findMany({
-		where: gte(spiele.datum, heute),
-		// Nach Datum, dann Anpfiff; Postgres sortiert NULL bei ASC zuletzt (ohne Uhrzeit hinten).
-		orderBy: [asc(spiele.datum), asc(spiele.uhrzeit)],
-		limit: 3
-	});
+	const [naechsteSpieleRaw, stichtag] = await Promise.all([
+		db.query.spiele.findMany({
+			where: gte(spiele.datum, heute),
+			// Nach Datum, dann Anpfiff; Postgres sortiert NULL bei ASC zuletzt (ohne Uhrzeit hinten).
+			orderBy: [asc(spiele.datum), asc(spiele.uhrzeit)],
+			limit: 3
+		}),
+		ermittleTerminierungsStichtag()
+	]);
 
 	const offeneFreigaben = await db.query.freigaben.findMany({
 		where: eq(freigaben.status, 'offen'),
@@ -43,7 +50,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	});
 
-	const naechsteSpiele = naechsteSpieleRaw.map((spiel) => ({
+	const naechsteSpiele = mitUhrzeitVorlaeufig(naechsteSpieleRaw, stichtag).map((spiel) => ({
 		...spiel,
 		freeCount: offeneFreigaben.filter((f) => f.spielId === spiel.id).length
 	}));

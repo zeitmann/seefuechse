@@ -4,7 +4,15 @@
 	import { RefreshCw } from '@lucide/svelte';
 	import type { SyncErgebnis } from '$lib/server/spielplanSync';
 
-	let { ergebnis }: { ergebnis: SyncErgebnis | null } = $props();
+	let {
+		ergebnis,
+		terminierungsStichtag
+	}: { ergebnis: SyncErgebnis | null; terminierungsStichtag: string | null } = $props();
+
+	// 'JJJJ-MM-TT' → 'TT.MM.JJJJ'
+	const stichtagText = $derived(
+		terminierungsStichtag ? terminierungsStichtag.split('-').reverse().join('.') : '–'
+	);
 
 	let laedt = $state(false);
 
@@ -41,6 +49,10 @@
 			<p>Saison 2026/27 via OpenLigaDB · Bundesliga, DFB-Pokal, Conference League</p>
 		</div>
 	</div>
+
+	<p class="stichtag">
+		Anstoßzeiten bestätigt bis: <strong>{stichtagText}</strong>
+	</p>
 
 	<form method="POST" action="?/synchronisieren" use:enhance={absenden}>
 		<button type="submit" class="btn-sync" disabled={laedt}>
@@ -130,6 +142,17 @@
 		margin: 2px 0 0;
 		font-size: 12px;
 		color: var(--color-text-muted);
+	}
+
+	.stichtag {
+		margin: 0;
+		font-size: 13px;
+		color: var(--color-text-muted);
+	}
+
+	.stichtag strong {
+		color: var(--color-text);
+		font-family: var(--font-mono);
 	}
 
 	form {

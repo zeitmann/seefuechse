@@ -24,7 +24,10 @@
 				</div>
 			</Card>
 		{:else}
-			<SpielplanSyncKarte ergebnis={form?.sync ?? null} />
+			<SpielplanSyncKarte
+				ergebnis={form?.sync ?? null}
+				terminierungsStichtag={data.terminierungsStichtag}
+			/>
 
 			<!-- Ausstehende Freischaltungen (nur für Admin/Vorstand) -->
 			<section class="section">

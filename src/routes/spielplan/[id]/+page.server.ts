@@ -20,14 +20,23 @@ import {
 	spielBezeichnung,
 	spielLink
 } from '$lib/server/benachrichtigungen';
+import {
+	ermittleTerminierungsStichtag,
+	istUhrzeitVorlaeufig
+} from '$lib/server/spielplanTermine';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	const spiel = await db.query.spiele.findFirst({
-		where: eq(spieleTable.id, params.id)
-	});
+	const [spielRoh, stichtag] = await Promise.all([
+		db.query.spiele.findFirst({
+			where: eq(spieleTable.id, params.id)
+		}),
+		ermittleTerminierungsStichtag()
+	]);
 
-	if (!spiel) error(404, 'Spiel nicht gefunden');
+	if (!spielRoh) error(404, 'Spiel nicht gefunden');
+
+	const spiel = { ...spielRoh, uhrzeitVorlaeufig: istUhrzeitVorlaeufig(spielRoh, stichtag) };
 
 	const { user } = await locals.safeGetSession();
 	const istAdmin = user ? await hatAdminRolle(user.id) : false;

@@ -92,6 +92,7 @@
 						<MatchCard
 							datum={spiel.datum}
 							uhrzeit={formatiereUhrzeit(spiel.uhrzeit)}
+							uhrzeitVorlaeufig={spiel.uhrzeitVorlaeufig}
 							heimAuswaerts={spiel.heimAuswaerts}
 							wettbewerb={spiel.wettbewerb}
 							gegner={spiel.gegner}

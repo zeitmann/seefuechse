@@ -4,6 +4,7 @@ import { mitglieder } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { hatVerwaltungsRolle, hatAdminRolle } from '$lib/server/rollen';
 import { synchronisiereSpielplan } from '$lib/server/spielplanSync';
+import { ermittleTerminierungsStichtag } from '$lib/server/spielplanTermine';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -12,6 +13,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	if (!user || !(await hatVerwaltungsRolle(user.id))) {
 		return {
 			kannVerwalten: false,
+			terminierungsStichtag: null,
 			istAdmin: false,
 			ausstehendeMitglieder: [] as { id: string; name: string; email: string }[]
 		};
@@ -24,7 +26,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(mitglieder)
 		.where(eq(mitglieder.status, 'ausstehend'));
 
-	return { kannVerwalten: true, istAdmin, ausstehendeMitglieder };
+	const terminierungsStichtag = await ermittleTerminierungsStichtag();
+
+	return { kannVerwalten: true, istAdmin, ausstehendeMitglieder, terminierungsStichtag };
 };
 
 /** Saison des OpenLigaDB-Syncs (2026 = Saison 2026/27). */

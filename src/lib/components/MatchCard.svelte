@@ -8,6 +8,7 @@
 		wettbewerb,
 		gegner,
 		uhrzeit = undefined,
+		uhrzeitVorlaeufig = false,
 		statusBadge
 	} = $props();
 
@@ -43,6 +44,11 @@
 				<div class="time-row">
 					<Clock size={16} />
 					<span>{uhrzeit} Uhr</span>
+					{#if uhrzeitVorlaeufig}
+						<span class="vorlaeufig" title="Anstoßzeit noch nicht von der DFL bestätigt">
+							vorläufig
+						</span>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -126,9 +132,19 @@
 
 	.time-row {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 6px;
 		font-size: 14px;
+		color: var(--color-text-muted);
+	}
+
+	.vorlaeufig {
+		padding: 1px 6px;
+		border: 1px dashed var(--color-border);
+		border-radius: var(--radius-full);
+		font-size: 11px;
+		font-weight: 600;
 		color: var(--color-text-muted);
 	}
 

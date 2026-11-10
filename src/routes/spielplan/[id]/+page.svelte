@@ -62,7 +62,13 @@
 					<h2 class="hero-gegner">{data.spiel.gegner}</h2>
 					<p class="hero-datum-long">
 						{formatDatum(data.spiel.datum)}{#if uhrzeit}&nbsp;· {uhrzeit} Uhr{/if}
+						{#if uhrzeit && data.spiel.uhrzeitVorlaeufig}(vorläufig){/if}
 					</p>
+					{#if uhrzeit && data.spiel.uhrzeitVorlaeufig}
+						<p class="vorlaeufig-hinweis">
+							Anstoßzeit noch nicht von der DFL bestätigt, kann sich ändern.
+						</p>
+					{/if}
 				</div>
 			</div>
 		</Card>
@@ -320,6 +326,15 @@
 		font-size: 22px;
 		font-weight: 700;
 		line-height: 1.2;
+	}
+
+	.vorlaeufig-hinweis {
+		margin: 8px 0 0;
+		padding: 6px 10px;
+		border-radius: var(--radius-md);
+		background: var(--color-warning-muted);
+		color: var(--color-warning);
+		font-size: 12px;
 	}
 
 	.hero-datum-long {
