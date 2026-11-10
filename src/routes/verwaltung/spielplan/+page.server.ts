@@ -60,12 +60,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.select({
 			id: spiele.id,
 			datum: spiele.datum,
+			uhrzeit: spiele.uhrzeit,
 			gegner: spiele.gegner,
 			wettbewerb: spiele.wettbewerb,
 			heimAuswaerts: spiele.heimAuswaerts
 		})
 		.from(spiele)
-		.orderBy(asc(spiele.datum), asc(spiele.gegner));
+		// Postgres sortiert NULL bei ASC zuletzt: Spiele ohne Uhrzeit stehen hinten.
+		.orderBy(asc(spiele.datum), asc(spiele.uhrzeit), asc(spiele.gegner));
 
 	const vereinsnamen = await vorhandeneGegner();
 

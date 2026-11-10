@@ -2,6 +2,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import MatchCard from '$lib/components/MatchCard.svelte';
+	import { formatiereUhrzeit } from '$lib/zeit';
 
 	let { data } = $props();
 
@@ -81,6 +82,7 @@
 					<a href="/spielplan/{spiel.id}" style="display:contents">
 						<MatchCard
 							datum={spiel.datum}
+							uhrzeit={formatiereUhrzeit(spiel.uhrzeit)}
 							heimAuswaerts={spiel.heimAuswaerts}
 							wettbewerb={spiel.wettbewerb}
 							gegner={spiel.gegner}

@@ -2,10 +2,12 @@
 	import { enhance } from '$app/forms';
 	import Card from './Card.svelte';
 	import { mitNeuladenBeiFehler } from '$lib/enhance';
+	import { formatiereUhrzeit } from '$lib/zeit';
 
 	type SpielProp = {
 		id: string;
 		datum: string;
+		uhrzeit?: string | null;
 		gegner: string;
 		wettbewerb: string;
 		heimAuswaerts: 'heim' | 'auswaerts';
@@ -35,6 +37,7 @@
 		toggleBeschriftung?: string;
 	} = $props();
 
+	const uhrzeit = $derived(formatiereUhrzeit(spiel.uhrzeit));
 	const istVergeben = $derived(freigabe?.status === 'vergeben');
 	const istFreigegeben = $derived(freigabe?.status === 'offen');
 
@@ -57,7 +60,9 @@
 					<span class="badge badge-heim-auswaerts">{spiel.heimAuswaerts === 'heim' ? 'HEIM' : 'AUSWÄRTS'}</span>
 				</div>
 				<p class="spiel-gegner">{spiel.gegner}</p>
-				<p class="spiel-datum">{formatDatum(spiel.datum)}</p>
+				<p class="spiel-datum">
+					{formatDatum(spiel.datum)}{#if uhrzeit}&nbsp;· {uhrzeit} Uhr{/if}
+				</p>
 			</div>
 
 			<div class="toggle-gruppe">

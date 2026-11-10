@@ -5,7 +5,8 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
 	const alleSpiele = await db.query.spiele.findMany({
-		orderBy: asc(spieleTable.datum)
+		// Nach Datum, dann Anpfiff; Postgres sortiert NULL bei ASC zuletzt (ohne Uhrzeit hinten).
+		orderBy: [asc(spieleTable.datum), asc(spieleTable.uhrzeit)]
 	});
 
 	const offeneFreigaben = await db

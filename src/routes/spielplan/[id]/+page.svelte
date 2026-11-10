@@ -5,10 +5,12 @@
 	import FreigabeZeile from '$lib/components/FreigabeZeile.svelte';
 	import FehlerHinweis from '$lib/components/FehlerHinweis.svelte';
 	import { mitNeuladenBeiFehler } from '$lib/enhance';
+	import { formatiereUhrzeit } from '$lib/zeit';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
+	const uhrzeit = $derived(formatiereUhrzeit(data.spiel.uhrzeit));
 	const heimAuswaertsText = $derived(data.spiel.heimAuswaerts === 'heim' ? 'HEIM' : 'AUSWÄRTS');
 
 	function formatDatum(dateStr: string): string {
@@ -58,7 +60,9 @@
 						<span class="badge badge-wettbewerb">{data.spiel.wettbewerb.toUpperCase()}</span>
 					</div>
 					<h2 class="hero-gegner">{data.spiel.gegner}</h2>
-					<p class="hero-datum-long">{formatDatum(data.spiel.datum)}</p>
+					<p class="hero-datum-long">
+						{formatDatum(data.spiel.datum)}{#if uhrzeit}&nbsp;· {uhrzeit} Uhr{/if}
+					</p>
 				</div>
 			</div>
 		</Card>

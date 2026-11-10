@@ -6,7 +6,13 @@
 	import { mitNeuladenBeiFehler } from '$lib/enhance';
 	import { heimAuswaertsText } from './anzeige';
 
-	type Werte = { datum: string; gegner: string; wettbewerb: string; heimAuswaerts: string };
+	type Werte = {
+		datum: string;
+		uhrzeit: string;
+		gegner: string;
+		wettbewerb: string;
+		heimAuswaerts: string;
+	};
 
 	let {
 		aktion,
@@ -38,6 +44,7 @@
 	// gemountet, ein Nachziehen ist daher nicht nötig. Bei Fehlern bleiben die
 	// Eingaben erhalten, weil update() nur bei Erfolg zurücksetzt.
 	let datum = $state(untrack(() => startwerte.datum));
+	let uhrzeit = $state(untrack(() => startwerte.uhrzeit));
 	let gegner = $state(untrack(() => startwerte.gegner));
 	let wettbewerb = $state(untrack(() => startwerte.wettbewerb));
 	let heimAuswaerts = $state(untrack(() => startwerte.heimAuswaerts));
@@ -86,17 +93,30 @@
 		<FehlerHinweis nachricht={fehler} />
 	{/if}
 
-	<label class="feld">
-		<span class="feld-label">Datum</span>
-		<input
-			class="feld-input"
-			name="datum"
-			type="date"
-			bind:value={datum}
-			onkeydown={enterAbfangen}
-			required
-		/>
-	</label>
+	<div class="feld-reihe">
+		<label class="feld">
+			<span class="feld-label">Datum</span>
+			<input
+				class="feld-input"
+				name="datum"
+				type="date"
+				bind:value={datum}
+				onkeydown={enterAbfangen}
+				required
+			/>
+		</label>
+
+		<label class="feld">
+			<span class="feld-label">Uhrzeit (Anpfiff)</span>
+			<input
+				class="feld-input"
+				name="uhrzeit"
+				type="time"
+				bind:value={uhrzeit}
+				onkeydown={enterAbfangen}
+			/>
+		</label>
+	</div>
 
 	<label class="feld">
 		<span class="feld-label">Gegner</span>

@@ -10,6 +10,7 @@ import {
 	uuid,
 	text,
 	date,
+	time,
 	timestamp,
 	boolean,
 	index,
@@ -97,6 +98,8 @@ export const dauerkarten = pgTable('dauerkarten', {
 export const spiele = pgTable('spiele', {
 	id: uuid('id').defaultRandom().primaryKey(),
 	datum: date('datum').notNull(),
+	// Anpfiff als Ortszeit (Europe/Berlin), 'HH:MM:SS'; null = noch unbekannt
+	uhrzeit: time('uhrzeit'),
 	gegner: text('gegner').notNull(),
 	wettbewerb: text('wettbewerb').notNull(),
 	heimAuswaerts: heimAuswaertsEnum('heim_auswaerts').notNull(),

@@ -47,3 +47,12 @@ export function relativeZeit(datum: Date | string, jetzt: Date = new Date()): st
 	// de-DE liefert '05.11.'
 	return kurzDatumFormat.format(zeitpunkt);
 }
+
+/**
+ * Anpfiff-Uhrzeit aus der DB ('HH:MM:SS') als 'HH:MM', null wenn keine gesetzt
+ * ist. Der Wert ist bereits deutsche Ortszeit – keine Zeitzonenumrechnung.
+ */
+export function formatiereUhrzeit(uhrzeit: string | null | undefined): string | null {
+	if (!uhrzeit) return null;
+	return uhrzeit.slice(0, 5);
+}

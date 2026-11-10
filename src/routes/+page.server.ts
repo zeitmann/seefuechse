@@ -29,7 +29,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const naechsteSpieleRaw = await db.query.spiele.findMany({
 		where: gte(spiele.datum, heute),
-		orderBy: asc(spiele.datum),
+		// Nach Datum, dann Anpfiff; Postgres sortiert NULL bei ASC zuletzt (ohne Uhrzeit hinten).
+		orderBy: [asc(spiele.datum), asc(spiele.uhrzeit)],
 		limit: 3
 	});
 

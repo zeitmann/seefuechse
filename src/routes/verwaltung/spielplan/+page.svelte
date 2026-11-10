@@ -66,6 +66,7 @@
 						aktion="?/spielAnlegen"
 						startwerte={{
 							datum: '',
+							uhrzeit: '',
 							gegner: '',
 							wettbewerb: data.wettbewerbe[0],
 							heimAuswaerts: data.heimAuswaertsWerte[0]

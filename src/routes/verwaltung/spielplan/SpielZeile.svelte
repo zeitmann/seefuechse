@@ -5,6 +5,7 @@
 	import { mitNeuladenBeiFehler } from '$lib/enhance';
 	import SpielFormular from './SpielFormular.svelte';
 	import { datumDeutsch, heimAuswaertsText } from './anzeige';
+	import { formatiereUhrzeit } from '$lib/zeit';
 	import type { PageData } from './$types';
 
 	let {
@@ -33,6 +34,8 @@
 
 	// Inline-Bestätigung statt window.confirm (zuverlässig auch in der iPhone-PWA).
 	let loeschenBestaetigen = $state(false);
+
+	const uhrzeit = $derived(formatiereUhrzeit(spiel.uhrzeit));
 	// Löschfehler nur nach eigenem Löschversuch anzeigen.
 	let loeschenAbgeschickt = $state(false);
 
@@ -54,7 +57,9 @@
 
 <li class="spiel">
 	<div class="spiel-info" class:vergangen>
-		<span class="spiel-datum">{datumDeutsch(spiel.datum)}</span>
+		<span class="spiel-datum">
+			{datumDeutsch(spiel.datum)}{#if uhrzeit}&nbsp;· {uhrzeit} Uhr{/if}
+		</span>
 		<span class="spiel-gegner">{spiel.gegner}</span>
 		<span class="spiel-meta">
 			{spiel.wettbewerb} · {heimAuswaertsText[spiel.heimAuswaerts] ?? spiel.heimAuswaerts}
@@ -65,7 +70,7 @@
 		<SpielFormular
 			aktion="?/spielAendern"
 			spielId={spiel.id}
-			startwerte={spiel}
+			startwerte={{ ...spiel, uhrzeit: uhrzeit ?? '' }}
 			{wettbewerbe}
 			{heimAuswaertsWerte}
 			{fehler}

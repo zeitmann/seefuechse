@@ -15,6 +15,8 @@ export type HeimAuswaerts = (typeof HEIM_AUSWAERTS_WERTE)[number];
 /** Vom Formular bearbeitbare Felder. openligadb_id ist bewusst nicht enthalten. */
 export type SpielDaten = {
 	datum: string;
+	/** 'HH:MM' oder null (keine Anpfiffzeit bekannt) */
+	uhrzeit: string | null;
 	gegner: string;
 	wettbewerb: Wettbewerb;
 	heimAuswaerts: HeimAuswaerts;
@@ -37,6 +39,11 @@ function istGueltigesDatum(wert: string): boolean {
 	);
 }
 
+/** 'HH:MM' mit Stunde 0–23 und Minute 0–59. */
+function istGueltigeUhrzeit(wert: string): boolean {
+	return /^([01]\d|2[0-3]):[0-5]\d$/.test(wert);
+}
+
 function istWettbewerb(wert: string): wert is Wettbewerb {
 	return (WETTBEWERBE as readonly string[]).includes(wert);
 }
@@ -51,12 +58,17 @@ function istHeimAuswaerts(wert: string): wert is HeimAuswaerts {
  */
 export function spielEingabePruefen(form: FormData): PruefErgebnis {
 	const datum = String(form.get('datum') ?? '').trim();
+	const uhrzeit = String(form.get('uhrzeit') ?? '').trim();
 	const gegner = leerzeichenBereinigen(String(form.get('gegner') ?? ''));
 	const wettbewerb = String(form.get('wettbewerb') ?? '');
 	const heimAuswaerts = String(form.get('heimAuswaerts') ?? '');
 
 	if (!istGueltigesDatum(datum)) {
 		return { ok: false, fehler: 'Bitte ein gültiges Datum angeben.' };
+	}
+	// Uhrzeit ist optional: leer → null
+	if (uhrzeit && !istGueltigeUhrzeit(uhrzeit)) {
+		return { ok: false, fehler: 'Bitte eine gültige Uhrzeit angeben.' };
 	}
 	if (gegner.length < 2 || gegner.length > 60) {
 		return { ok: false, fehler: 'Der Gegner muss 2 bis 60 Zeichen lang sein.' };
@@ -67,7 +79,10 @@ export function spielEingabePruefen(form: FormData): PruefErgebnis {
 	if (!istHeimAuswaerts(heimAuswaerts)) {
 		return { ok: false, fehler: 'Bitte Heim oder Auswärts auswählen.' };
 	}
-	return { ok: true, daten: { datum, gegner, wettbewerb, heimAuswaerts } };
+	return {
+		ok: true,
+		daten: { datum, uhrzeit: uhrzeit || null, gegner, wettbewerb, heimAuswaerts }
+	};
 }
 
 /** Alle bisher verwendeten Gegnernamen (kanonische Schreibweisen), alphabetisch. */
@@ -106,7 +121,8 @@ export async function gegnerVereinheitlichen(
 }
 
 /**
- * Gibt es schon ein Spiel mit gleichem Datum, Gegner und Wettbewerb? `ausserId`
+ * Gibt es schon ein Spiel mit gleichem Datum, Gegner und Wettbewerb (Uhrzeit
+ * bewusst nicht berücksichtigt)? `ausserId`
  * nimmt beim Ändern das eigene Spiel aus.
  */
 async function existiertBereits(daten: SpielDaten, ausserId?: string): Promise<boolean> {
@@ -145,6 +161,8 @@ export async function spielAendern(spielId: string, daten: SpielDaten): Promise<
 		.update(spiele)
 		.set({
 			datum: daten.datum,
+			// Leeres Feld löscht eine vorhandene Uhrzeit (null).
+			uhrzeit: daten.uhrzeit,
 			gegner: daten.gegner,
 			wettbewerb: daten.wettbewerb,
 			heimAuswaerts: daten.heimAuswaerts
