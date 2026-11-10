@@ -59,19 +59,27 @@ function alsUtcDatum(datum: string): Date {
 	return new Date(Date.UTC(jahr, monat - 1, tag));
 }
 
+/** Weicher Trennstrich: unsichtbar, außer die Zeile bricht genau dort um. */
+const WEICHE_TRENNUNG = '­';
+
+/** Bekannte Komposita-Anfänge von Rundennamen ('Achtel|finale', 'Zwischen|runde'). */
+const RUNDEN_PRAEFIX = /^(Achtel|Viertel|Halb|Zwischen)(?=\S)/i;
+
 /**
  * Zerlegt die Runde für den großen Block der Kachel: '3. Spieltag' →
- * { gross: '3', klein: 'Spieltag' }; 'Achtelfinale' → { gross: 'Achtelfinale',
- * klein: null } (Text, wird kleiner gesetzt); keine Runde → null.
+ * { gross: '3', klein: 'Spieltag' }; 'Achtelfinale' → { gross:
+ * 'Achtel­finale', klein: null } (Text, wird kleiner gesetzt und darf an
+ * der weichen Trennung umbrechen). `titel` ist immer der volle Name ohne
+ * weiche Trennung (für title-Attribute). Keine Runde → null.
  */
 export function rundeAnzeige(
 	runde: string | null | undefined
-): { gross: string; klein: string | null } | null {
+): { gross: string; klein: string | null; titel: string } | null {
 	const text = runde?.trim();
 	if (!text) return null;
 	const treffer = /^(\d+)\.\s*(.+)$/.exec(text);
-	if (treffer) return { gross: treffer[1], klein: treffer[2] };
-	return { gross: text, klein: null };
+	if (treffer) return { gross: treffer[1], klein: treffer[2], titel: text };
+	return { gross: text.replace(RUNDEN_PRAEFIX, `$1${WEICHE_TRENNUNG}`), klein: null, titel: text };
 }
 
 /** 'Sa., 21. Nov.' */

@@ -46,8 +46,8 @@
 					<div class="date-day">{rundeBlock.gross}</div>
 					<div class="runde-label">{rundeBlock.klein}</div>
 				{:else}
-					<!-- Voller Name als title, falls er abgeschnitten wird -->
-					<div class="runde-text" title={rundeBlock.gross}>{rundeBlock.gross}</div>
+					<!-- gross enthält weiche Trennungen ('Achtel­finale'), title den vollen Namen -->
+					<div class="runde-text" title={rundeBlock.titel}>{rundeBlock.gross}</div>
 				{/if}
 			{:else}
 				<div class="date-day">{datumBlock.tag}</div>
@@ -63,8 +63,11 @@
 			<h3 class="gegner">{gegner}</h3>
 			{#if rundeBlock || uhrzeit}
 				<div class="time-row">
-					<Clock size={16} />
-					<span>{datumKurz(datum)}{#if uhrzeit}&nbsp;· {uhrzeit} Uhr{/if}</span>
+					<!-- Symbol und Text als Einheit, damit die Uhr nie allein in einer Zeile steht -->
+					<span class="zeit">
+						<Clock size={14} />
+						<span class="zeit-text">{datumKurz(datum)}{#if uhrzeit}&nbsp;· {uhrzeit}{/if}</span>
+					</span>
 					{#if uhrzeit && uhrzeitVorlaeufig}
 						<span class="vorlaeufig" title="Anstoßzeit noch nicht von der DFL bestätigt">
 							vorläufig
@@ -83,7 +86,7 @@
 			{:else if zeigeStatus}
 				<span class="badge badge-status">{statusBadge}</span>
 			{/if}
-			<ChevronRight size={20} />
+			<ChevronRight size={16} />
 		</div>
 	</div>
 </Card>
@@ -91,14 +94,14 @@
 <style>
 	.match-card {
 		display: flex;
-		gap: 16px;
+		gap: 12px;
 		align-items: center;
 	}
 
 	.date-section {
 		flex-shrink: 0;
 		/* Feste Breite, damit Spieltag, Runde und Datum in der Liste fluchten */
-		width: 76px;
+		width: 60px;
 		text-align: center;
 		font-family: var(--font-mono);
 	}
@@ -127,21 +130,21 @@
 	}
 
 	/*
-	 * Runde ohne Nummer ('Achtelfinale'): einzeilig, ohne Trennung. 10px passt für
-	 * Achtel-/Viertelfinale in 76px (ca. 69–75px); Längeres ('Zwischenrunde') endet
-	 * mit '…', voller Name im title und vollständig im DOM (Screenreader).
+	 * Runde ohne Nummer ('Achtelfinale'): höchstens zweizeilig, getrennt nur an den
+	 * weichen Trennungen aus rundeAnzeige ('Achtel-' / 'finale'). Bei 11px ist
+	 * 'Achtelfinale' 63px breit und bricht in 60px um; 'Halbfinale' (53px) und
+	 * 'Finale' bleiben einzeilig.
 	 */
 	.runde-text {
 		font-family: var(--font-sans);
-		font-size: 10px;
+		font-size: 11px;
 		font-weight: 700;
 		letter-spacing: -0.2px;
-		line-height: 1.2;
+		line-height: 1.1;
 		color: var(--color-text);
-		white-space: nowrap;
-		hyphens: none;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		hyphens: manual;
+		/* Absicherung für unbekannte lange Einzelwörter */
+		overflow-wrap: anywhere;
 	}
 
 	.content-section {
@@ -149,39 +152,38 @@
 		min-width: 0;
 	}
 
+	/* Beide Badges in einer Zeile; bei Platzmangel kürzt nur das Wettbewerb-Badge */
 	.badges-row {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
+		flex-wrap: nowrap;
+		gap: 4px;
 		margin-bottom: 8px;
 	}
 
 	.badge {
 		display: inline-block;
-		padding: 4px 8px;
+		/* Ohne Rahmen (hatte die Hintergrundfarbe); 5px oben/unten statt 4px + 1px
+		   Rahmen, damit die Höhe gleich bleibt */
+		padding: 5px;
 		border-radius: 6px;
-		font-size: 11px;
+		font-size: 10px;
 		font-weight: 600;
-		letter-spacing: 0.5px;
-		/* Lange Wettbewerbe ('CONFERENCE LEAGUE') nicht im Badge umbrechen, sondern
-		   bei 375px mit '…' kürzen statt über das Ergebnis rechts zu ragen */
+		letter-spacing: 0.1px;
 		white-space: nowrap;
-		max-width: 100%;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		vertical-align: top;
 	}
 
 	.badge-heim {
+		flex-shrink: 0;
 		background-color: var(--badge-heim-bg);
 		color: var(--badge-heim-text);
-		border: 1px solid var(--badge-heim-bg);
 	}
 
 	.badge-wettbewerb {
+		min-width: 0;
 		background-color: var(--badge-wettbewerb-bg);
 		color: var(--badge-wettbewerb-text);
-		border: 1px solid var(--badge-wettbewerb-bg);
 	}
 
 	.gegner {
@@ -195,13 +197,34 @@
 		hyphens: auto;
 	}
 
+	/* "vorläufig" darf in eine eigene Zeile rutschen, Uhr und Text nie getrennt */
 	.time-row {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 6px;
-		font-size: 14px;
+		gap: 4px 6px;
+		font-size: 12px;
 		color: var(--color-text-muted);
+	}
+
+	.zeit {
+		display: flex;
+		flex-wrap: nowrap;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		max-width: 100%;
+	}
+
+	.zeit :global(svg) {
+		flex-shrink: 0;
+	}
+
+	.zeit-text {
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.vorlaeufig {
@@ -217,13 +240,13 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: 4px;
 		color: var(--color-text-muted);
 	}
 
 	.ergebnis {
 		font-family: var(--font-mono);
-		font-size: 20px;
+		font-size: 18px;
 		font-weight: 700;
 		color: var(--color-text);
 		white-space: nowrap;
@@ -244,6 +267,5 @@
 	.badge-status {
 		background-color: var(--badge-status-bg);
 		color: var(--badge-status-text);
-		border: 1px solid var(--badge-status-bg);
 	}
 </style>
