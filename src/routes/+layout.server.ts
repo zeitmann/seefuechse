@@ -2,6 +2,7 @@ import { db } from '$lib/server/db';
 import { mitglieder, dauerkarten } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { hatVerwaltungsRolle } from '$lib/server/rollen';
+import { ungeleseneAnzahl } from '$lib/server/benachrichtigungen';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
@@ -10,6 +11,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	let mitgliedStatus: 'ausstehend' | 'aktiv' | 'abgelehnt' | null = null;
 	let hasDauerkarte = false;
 	let kannVerwalten = false;
+	// Zähler für die Glocke im Header
+	let ungelesen = 0;
 
 	if (user) {
 		const rows = await db
@@ -27,7 +30,11 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		hasDauerkarte = eigeneDauerkarte.length > 0;
 
 		kannVerwalten = await hatVerwaltungsRolle(user.id);
+
+		if (mitgliedStatus === 'aktiv') {
+			ungelesen = await ungeleseneAnzahl(user.id);
+		}
 	}
 
-	return { session, user, mitgliedStatus, hasDauerkarte, kannVerwalten };
+	return { session, user, mitgliedStatus, hasDauerkarte, kannVerwalten, ungelesen };
 };
