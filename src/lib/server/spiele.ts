@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, eq, ne, notExists } from 'drizzle-orm';
+import { and, eq, ne, notExists, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { freigaben, heimAuswaertsEnum, interesse, spiele } from '$lib/server/db/schema';
 import { findeAehnlichenVerein, leerzeichenBereinigen } from '$lib/server/vereinsnamen';
@@ -158,6 +158,12 @@ export async function spielAnlegen(daten: SpielDaten): Promise<void> {
  * Ändert die bearbeitbaren Felder eines Spiels. openligadb_id bleibt unangetastet;
  * Freigaben, Bewerbungen und Interesse hängen an der Spiel-ID und bleiben erhalten.
  * 404 bei unbekannter ID, 409 bei Dubletten.
+ *
+ * Synchronisierte Spiele (mit openligadb_id) werden bei einer tatsächlichen
+ * Änderung im selben UPDATE als manuell überschrieben markiert, damit der
+ * OpenLigaDB-Sync sie nicht zurücksetzt. Im SET sieht Postgres noch die alten
+ * Werte, daher vergleicht der CASE-Ausdruck den bisherigen mit dem neuen Stand.
+ * Ohne openligadb_id oder ohne Änderung bleibt das Flag wie es ist.
  */
 export async function spielAendern(spielId: string, daten: SpielDaten): Promise<void> {
 	if (!UUID_MUSTER.test(spielId)) error(404, NICHT_MEHR_VORHANDEN);
@@ -171,7 +177,17 @@ export async function spielAendern(spielId: string, daten: SpielDaten): Promise<
 			uhrzeit: daten.uhrzeit,
 			gegner: daten.gegner,
 			wettbewerb: daten.wettbewerb,
-			heimAuswaerts: daten.heimAuswaerts
+			heimAuswaerts: daten.heimAuswaerts,
+			manuellUeberschrieben: sql`case
+				when ${spiele.openligadbId} is not null
+					and (${spiele.datum}, ${spiele.uhrzeit}, ${spiele.gegner}, ${spiele.wettbewerb},
+						${spiele.heimAuswaerts})
+					is distinct from
+					(${daten.datum}::date, ${daten.uhrzeit}::time, ${daten.gegner}::text,
+						${daten.wettbewerb}::text, ${daten.heimAuswaerts}::heim_auswaerts)
+				then true
+				else ${spiele.manuellUeberschrieben}
+			end`
 		})
 		.where(eq(spiele.id, spielId))
 		.returning({ id: spiele.id });

@@ -95,6 +95,12 @@ export const dauerkarten = pgTable('dauerkarten', {
 	platz: text('platz').notNull()
 });
 
+/**
+ * ACHTUNG: Der UNIQUE-Index `spiele_openligadb_id_uniq` auf openligadb_id existiert
+ * nur in der Datenbank (manuell angelegt) und ist hier nicht deklariert. Der
+ * OpenLigaDB-Sync braucht ihn für `on conflict (openligadb_id)`. Deshalb KEIN
+ * `drizzle-kit push` ausführen – das würde den Index entfernen.
+ */
 export const spiele = pgTable('spiele', {
 	id: uuid('id').defaultRandom().primaryKey(),
 	datum: date('datum').notNull(),

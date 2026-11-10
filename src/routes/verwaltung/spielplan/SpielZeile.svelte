@@ -67,6 +67,9 @@
 	</div>
 
 	{#if bearbeiten}
+		{#if spiel.manuellUeberschrieben}
+			<p class="manuell-hinweis">Manuell geändert, wird vom Sync nicht überschrieben</p>
+		{/if}
 		<SpielFormular
 			aktion="?/spielAendern"
 			spielId={spiel.id}
@@ -170,6 +173,16 @@
 	.spiel-meta {
 		font-size: 12px;
 		color: var(--color-text-muted);
+	}
+
+	.manuell-hinweis {
+		margin: 0;
+		padding: 6px 10px;
+		border-radius: var(--radius-md);
+		background: var(--color-info-muted);
+		color: var(--color-info);
+		font-size: 12px;
+		font-weight: 600;
 	}
 
 	.aktionen {

@@ -63,7 +63,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			uhrzeit: spiele.uhrzeit,
 			gegner: spiele.gegner,
 			wettbewerb: spiele.wettbewerb,
-			heimAuswaerts: spiele.heimAuswaerts
+			heimAuswaerts: spiele.heimAuswaerts,
+			manuellUeberschrieben: spiele.manuellUeberschrieben
 		})
 		.from(spiele)
 		// Postgres sortiert NULL bei ASC zuletzt: Spiele ohne Uhrzeit stehen hinten.
