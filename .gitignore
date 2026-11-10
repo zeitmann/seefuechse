@@ -11,3 +11,7 @@ vite.config.ts.timestamp-*
 
 # Netlify Build-Artefakte
 .netlify
+
+# Testkonten mit Zugangsdaten, nie einchecken
+testing/TestAccounts.md
+testing/Rollenzuordnung.md
