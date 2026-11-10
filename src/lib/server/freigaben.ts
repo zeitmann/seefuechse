@@ -1,11 +1,25 @@
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { dauerkarten, freigaben, bewerbungen, interesse } from '$lib/server/db/schema';
+import {
+	dauerkarten,
+	freigaben,
+	bewerbungen,
+	interesse,
+	mitglieder,
+	spiele
+} from '$lib/server/db/schema';
 import { eq, and, ne, inArray } from 'drizzle-orm';
+import {
+	benachrichtigenOhneFehler,
+	kuerzlichBenachrichtigt,
+	spielBezeichnung,
+	spielLink
+} from '$lib/server/benachrichtigungen';
 
 export async function toggleFreigabe(userId: string, spielId: string): Promise<void> {
 	const eigenesDauerkarte = await db.query.dauerkarten.findFirst({
-		where: eq(dauerkarten.besitzerId, userId)
+		where: eq(dauerkarten.besitzerId, userId),
+		with: { besitzer: { columns: { name: true } } }
 	});
 	if (!eigenesDauerkarte) error(403, 'Keine Dauerkarte');
 
@@ -13,17 +27,22 @@ export async function toggleFreigabe(userId: string, spielId: string): Promise<v
 		where: and(eq(freigaben.dauerkarteId, eigenesDauerkarte.id), eq(freigaben.spielId, spielId))
 	});
 
+	// Nur wenn die Freigabe danach 'offen' ist, wird benachrichtigt.
+	let jetztOffen = false;
+
 	if (!vorhandeneFreigabe) {
 		await db.insert(freigaben).values({
 			dauerkarteId: eigenesDauerkarte.id,
 			spielId,
 			status: 'offen'
 		});
+		jetztOffen = true;
 	} else if (vorhandeneFreigabe.status === 'zurueckgezogen') {
 		await db
 			.update(freigaben)
 			.set({ status: 'offen' })
 			.where(eq(freigaben.id, vorhandeneFreigabe.id));
+		jetztOffen = true;
 	} else if (vorhandeneFreigabe.status === 'offen') {
 		await db
 			.update(freigaben)
@@ -31,6 +50,36 @@ export async function toggleFreigabe(userId: string, spielId: string): Promise<v
 			.where(eq(freigaben.id, vorhandeneFreigabe.id));
 	}
 	// status === 'vergeben' → keine Wirkung
+
+	if (!jetztOffen) return;
+
+	const besitzerName = eigenesDauerkarte.besitzer.name;
+	await benachrichtigenOhneFehler(async () => {
+		const [spiel, aktive] = await Promise.all([
+			db.query.spiele.findFirst({
+				columns: { gegner: true, heimAuswaerts: true },
+				where: eq(spiele.id, spielId)
+			}),
+			db
+				.select({ id: mitglieder.id })
+				.from(mitglieder)
+				.where(eq(mitglieder.status, 'aktiv'))
+		]);
+		if (!spiel) return null;
+
+		const daten = {
+			empfaengerIds: aktive.map((m) => m.id),
+			typ: 'karte_freigegeben' as const,
+			titel: 'Karte freigegeben',
+			text: `${besitzerName} hat eine Karte für ${spielBezeichnung(spiel)} freigegeben.`,
+			link: spielLink(spielId),
+			ausloeserId: userId
+		};
+		// Spam-Schutz bei schnellem Hin- und Herschalten: gleiche Meldung höchstens
+		// einmal pro Stunde.
+		if (await kuerzlichBenachrichtigt(daten, 60)) return null;
+		return daten;
+	});
 }
 
 /** Nur die Schreib-Methoden, die beide Aufrufer brauchen – erfüllt von `db` wie von einer Transaktion. */
@@ -45,13 +94,14 @@ type Ausfuehrer = Pick<typeof db, 'select' | 'insert' | 'update' | 'delete'>;
  * - `vergebenAnMitInteresse` (Mitglied hatte evtl. nur Interesse → ggf. INSERT).
  *
  * Verhalten für `vergebenAn` bleibt identisch (Option `bewerbungAnlegenFallsFehlt: false`).
+ * Gibt die mitgliedIds der dabei abgelehnten Anfragen zurück.
  */
 async function bewerbungenNachVergabeSynchronisieren(
 	exec: Ausfuehrer,
 	freigabeId: string,
 	angenommeneMitgliedId: string,
 	{ bewerbungAnlegenFallsFehlt }: { bewerbungAnlegenFallsFehlt: boolean }
-): Promise<void> {
+): Promise<string[]> {
 	if (bewerbungAnlegenFallsFehlt) {
 		const [vorhanden] = await exec
 			.select({ id: bewerbungen.id })
@@ -88,12 +138,20 @@ async function bewerbungenNachVergabeSynchronisieren(
 			);
 	}
 
-	await exec
+	// Nur noch offene Anfragen kippen auf 'abgelehnt'; deren Mitglieder werden
+	// zurückgegeben (für die Benachrichtigung nach dem Commit).
+	const abgelehnt = await exec
 		.update(bewerbungen)
 		.set({ status: 'abgelehnt' })
 		.where(
-			and(eq(bewerbungen.freigabeId, freigabeId), ne(bewerbungen.mitgliedId, angenommeneMitgliedId))
-		);
+			and(
+				eq(bewerbungen.freigabeId, freigabeId),
+				ne(bewerbungen.mitgliedId, angenommeneMitgliedId),
+				eq(bewerbungen.status, 'angefragt')
+			)
+		)
+		.returning({ mitgliedId: bewerbungen.mitgliedId });
+	return abgelehnt.map((b) => b.mitgliedId);
 }
 
 /**
@@ -109,6 +167,39 @@ async function interesseNachVergabeEntfernen(
 	await exec
 		.delete(interesse)
 		.where(and(eq(interesse.mitgliedId, empfaengerId), eq(interesse.spielId, spielId)));
+}
+
+/**
+ * Benachrichtigt nach einer abgeschlossenen Vergabe die angenommene Person und
+ * alle abgelehnten Personen. Wirft nie (siehe benachrichtigenOhneFehler).
+ */
+async function nachVergabeBenachrichtigen(
+	besitzerId: string,
+	spiel: { id: string; gegner: string; heimAuswaerts: 'heim' | 'auswaerts' },
+	angenommeneMitgliedId: string,
+	abgelehnteMitgliedIds: string[]
+): Promise<void> {
+	const bezeichnung = spielBezeichnung(spiel);
+	const link = spielLink(spiel.id);
+
+	await Promise.all([
+		benachrichtigenOhneFehler({
+			empfaengerIds: [angenommeneMitgliedId],
+			typ: 'anfrage_angenommen',
+			titel: 'Anfrage angenommen',
+			text: `Du bekommst die Karte für ${bezeichnung}.`,
+			link,
+			ausloeserId: besitzerId
+		}),
+		benachrichtigenOhneFehler({
+			empfaengerIds: abgelehnteMitgliedIds,
+			typ: 'anfrage_abgelehnt',
+			titel: 'Anfrage abgelehnt',
+			text: `Die Karte für ${bezeichnung} wurde an jemand anderen vergeben.`,
+			link,
+			ausloeserId: besitzerId
+		})
+	]);
 }
 
 /**
@@ -140,7 +231,7 @@ export async function vergebenAn(
 ): Promise<void> {
 	const freigabe = await db.query.freigaben.findFirst({
 		where: eq(freigaben.id, freigabeId),
-		with: { dauerkarte: true }
+		with: { dauerkarte: true, spiel: true }
 	});
 
 	if (!freigabe || freigabe.dauerkarte.besitzerId !== userId) {
@@ -149,7 +240,7 @@ export async function vergebenAn(
 
 	if (freigabe.status !== 'offen') return;
 
-	await db.transaction(async (tx) => {
+	const abgelehnteIds = await db.transaction(async (tx) => {
 		// Bedingtes UPDATE als Race-Schutz: nur wenn die Freigabe noch 'offen' ist.
 		const [vergeben] = await tx
 			.update(freigaben)
@@ -158,13 +249,18 @@ export async function vergebenAn(
 			.returning({ spielId: freigaben.spielId });
 
 		// Zwischenzeitlich anderweitig vergeben/zurückgezogen → nichts weiter tun.
-		if (!vergeben) return;
+		if (!vergeben) return null;
 
-		await bewerbungenNachVergabeSynchronisieren(tx, freigabeId, mitgliedId, {
+		const abgelehnt = await bewerbungenNachVergabeSynchronisieren(tx, freigabeId, mitgliedId, {
 			bewerbungAnlegenFallsFehlt: false
 		});
 		await interesseNachVergabeEntfernen(tx, vergeben.spielId, mitgliedId);
+		return abgelehnt;
 	});
+
+	// Keine Vergabe (Race) → keine Benachrichtigung. Sonst erst nach dem Commit.
+	if (!abgelehnteIds) return;
+	await nachVergabeBenachrichtigen(userId, freigabe.spiel, mitgliedId, abgelehnteIds);
 }
 
 /**
@@ -186,7 +282,7 @@ export async function vergebenAnMitInteresse(
 		error(403, 'Keine Berechtigung');
 	}
 
-	await db.transaction(async (tx) => {
+	const vergabe = await db.transaction(async (tx) => {
 		// 2. Freigabe für (dauerkarteId, spielId) finden bzw. anlegen.
 		const vorhandeneFreigabe = await tx.query.freigaben.findFirst({
 			where: and(eq(freigaben.dauerkarteId, dauerkarteId), eq(freigaben.spielId, spielId))
@@ -222,11 +318,26 @@ export async function vergebenAnMitInteresse(
 		}
 
 		// 3. + 4. Gewählte Bewerbung sicherstellen/annehmen, Rest ablehnen.
-		await bewerbungenNachVergabeSynchronisieren(tx, vergebeneFreigabe.id, mitgliedId, {
-			bewerbungAnlegenFallsFehlt: true
-		});
+		const abgelehnteIds = await bewerbungenNachVergabeSynchronisieren(
+			tx,
+			vergebeneFreigabe.id,
+			mitgliedId,
+			{ bewerbungAnlegenFallsFehlt: true }
+		);
 
 		// 5. Interesse des Empfängers für dieses Spiel entfernen (Spiel-ID aus der Freigabe).
 		await interesseNachVergabeEntfernen(tx, vergebeneFreigabe.spielId, mitgliedId);
+
+		return { spielId: vergebeneFreigabe.spielId, abgelehnteIds };
 	});
+
+	// 6. Nach dem Commit benachrichtigen (Fehler beim Laden des Spiels werden geloggt).
+	try {
+		const spiel = await db.query.spiele.findFirst({ where: eq(spiele.id, vergabe.spielId) });
+		if (spiel) {
+			await nachVergabeBenachrichtigen(userId, spiel, mitgliedId, vergabe.abgelehnteIds);
+		}
+	} catch (e) {
+		console.error('Benachrichtigung nach Vergabe fehlgeschlagen:', e);
+	}
 }

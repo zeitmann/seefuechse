@@ -3,7 +3,7 @@
 // Kernfunktionen für In-App-Benachrichtigungen. Der Push-Versand wird in einem
 // späteren Schritt in benachrichtigen() angehängt.
 
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { benachrichtigungen, mitglieder, type BenachrichtigungTyp } from '$lib/server/db/schema';
 
@@ -53,6 +53,64 @@ export async function benachrichtigen(
 	// TODO Schritt 4: Push-Versand für die eingefügten Zeilen anstoßen
 
 	return eingefuegt;
+}
+
+/**
+ * Wie benachrichtigen(), wirft aber nie: Fehler werden nur geloggt. Gedacht für
+ * Aufrufe NACH Abschluss der eigentlichen DB-Transaktion, damit eine fehlgeschlagene
+ * Benachrichtigung die bereits gespeicherte Aktion nicht als Fehler erscheinen lässt.
+ *
+ * Statt fertiger Daten kann auch eine Funktion übergeben werden, die die Daten erst
+ * lädt (z. B. Namen, Spieldaten). Dann sind auch Fehler beim Laden abgefangen;
+ * liefert sie null, wird nicht benachrichtigt.
+ */
+export async function benachrichtigenOhneFehler(
+	daten: BenachrichtigenDaten | (() => Promise<BenachrichtigenDaten | null>)
+): Promise<void> {
+	try {
+		const aufgeloest = typeof daten === 'function' ? await daten() : daten;
+		if (aufgeloest) await benachrichtigen(aufgeloest);
+	} catch (e) {
+		console.error('Benachrichtigung fehlgeschlagen:', e);
+	}
+}
+
+/** Anzeigename eines Spiels aus Sicht des SC Freiburg, z. B. 'SC Freiburg – FC Bayern'. */
+export function spielBezeichnung(spiel: {
+	gegner: string;
+	heimAuswaerts: 'heim' | 'auswaerts';
+}): string {
+	return spiel.heimAuswaerts === 'heim'
+		? `SC Freiburg – ${spiel.gegner}`
+		: `${spiel.gegner} – SC Freiburg`;
+}
+
+/** Link-Ziel aller Benachrichtigungen zu einem Spiel. */
+export function spielLink(spielId: string): string {
+	return `/spielplan/${spielId}`;
+}
+
+/**
+ * Gibt es innerhalb der letzten `minuten` bereits irgendeine Benachrichtigung mit
+ * genau diesem typ, link und text (egal für welchen Empfänger)? Spam-Schutz.
+ */
+export async function kuerzlichBenachrichtigt(
+	{ typ, link, text }: Pick<BenachrichtigenDaten, 'typ' | 'link' | 'text'>,
+	minuten: number
+): Promise<boolean> {
+	const [treffer] = await db
+		.select({ id: benachrichtigungen.id })
+		.from(benachrichtigungen)
+		.where(
+			and(
+				eq(benachrichtigungen.typ, typ),
+				eq(benachrichtigungen.link, link),
+				eq(benachrichtigungen.text, text),
+				gt(benachrichtigungen.erstelltAm, sql`now() - make_interval(mins => ${minuten}::int)`)
+			)
+		)
+		.limit(1);
+	return treffer != null;
 }
 
 /** Anzahl ungelesener Benachrichtigungen eines Mitglieds. */

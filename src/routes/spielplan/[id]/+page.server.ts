@@ -5,7 +5,8 @@ import {
 	dauerkarten,
 	freigaben,
 	bewerbungen,
-	interesse
+	interesse,
+	mitglieder
 } from '$lib/server/db/schema';
 import { eq, and, ne, sql } from 'drizzle-orm';
 import { toggleFreigabe, vergebenAn, vergebenAnMitInteresse } from '$lib/server/freigaben';
@@ -14,6 +15,11 @@ import { bewerbungZurueckziehen } from '$lib/server/bewerbungen';
 import { istUniqueViolation } from '$lib/server/db/errors';
 import { hatAdminRolle } from '$lib/server/rollen';
 import { alsAktionsFehler } from '$lib/server/aktionen';
+import {
+	benachrichtigenOhneFehler,
+	spielBezeichnung,
+	spielLink
+} from '$lib/server/benachrichtigungen';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -234,7 +240,7 @@ export const actions: Actions = {
 		// Autorisierung: auf eine eigene Freigabe darf man sich nicht bewerben.
 		const zielFreigabe = await db.query.freigaben.findFirst({
 			where: eq(freigaben.id, freigabeId),
-			with: { dauerkarte: true }
+			with: { dauerkarte: true, spiel: true }
 		});
 		if (!zielFreigabe) error(404, 'Freigabe nicht gefunden');
 		if (zielFreigabe.dauerkarte.besitzerId === user.id) {
@@ -245,17 +251,42 @@ export const actions: Actions = {
 		// INSERT ... SELECT ... WHERE, ohne separates Read-then-Write. Doppelte
 		// Bewerbungen desselben Mitglieds fängt der Unique Constraint
 		// (freigabe_id, mitglied_id) ab (analog zum interesse-Pattern).
+		// `returning id` zeigt, ob wirklich eine Zeile angelegt wurde (postgres-js
+		// liefert die Ergebnis-Zeilen als Array).
+		let angelegt = false;
 		try {
-			await db.execute(sql`
+			const zeilen = await db.execute(sql`
 				insert into ${bewerbungen} ("freigabe_id", "mitglied_id", "status")
 				select ${freigabeId}::uuid, ${user.id}::uuid, 'angefragt'::bewerbung_status
 				where exists (
 					select 1 from ${freigaben}
 					where ${freigaben.id} = ${freigabeId}::uuid and ${freigaben.status} = 'offen'
 				)
+				returning id
 			`);
+			angelegt = zeilen.length > 0;
 		} catch (e) {
 			if (!istUniqueViolation(e)) throw e;
+		}
+
+		// Nur bei neu angelegter Anfrage den Besitzer benachrichtigen.
+		if (angelegt) {
+			await benachrichtigenOhneFehler(async () => {
+				const bewerber = await db.query.mitglieder.findFirst({
+					columns: { name: true },
+					where: eq(mitglieder.id, user.id)
+				});
+				if (!bewerber) return null;
+				const bezeichnung = spielBezeichnung(zielFreigabe.spiel);
+				return {
+					empfaengerIds: [zielFreigabe.dauerkarte.besitzerId],
+					typ: 'neue_anfrage' as const,
+					titel: 'Neue Anfrage',
+					text: `${bewerber.name} fragt deine Karte für ${bezeichnung} an.`,
+					link: spielLink(zielFreigabe.spielId),
+					ausloeserId: user.id
+				};
+			});
 		}
 	},
 
