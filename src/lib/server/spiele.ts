@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { and, eq, ne, notExists } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { freigaben, heimAuswaertsEnum, interesse, spiele } from '$lib/server/db/schema';
+import { findeAehnlichenVerein, leerzeichenBereinigen } from '$lib/server/vereinsnamen';
 
 /** Erlaubte Wettbewerbe – exakt die Werte, nach denen /spielplan filtert. */
 export const WETTBEWERBE = ['Bundesliga', 'DFB-Pokal', 'Europa League'] as const;
@@ -50,7 +51,7 @@ function istHeimAuswaerts(wert: string): wert is HeimAuswaerts {
  */
 export function spielEingabePruefen(form: FormData): PruefErgebnis {
 	const datum = String(form.get('datum') ?? '').trim();
-	const gegner = String(form.get('gegner') ?? '').trim();
+	const gegner = leerzeichenBereinigen(String(form.get('gegner') ?? ''));
 	const wettbewerb = String(form.get('wettbewerb') ?? '');
 	const heimAuswaerts = String(form.get('heimAuswaerts') ?? '');
 
@@ -67,6 +68,41 @@ export function spielEingabePruefen(form: FormData): PruefErgebnis {
 		return { ok: false, fehler: 'Bitte Heim oder Auswärts auswählen.' };
 	}
 	return { ok: true, daten: { datum, gegner, wettbewerb, heimAuswaerts } };
+}
+
+/** Alle bisher verwendeten Gegnernamen (kanonische Schreibweisen), alphabetisch. */
+export async function vorhandeneGegner(): Promise<string[]> {
+	const zeilen = await db
+		.selectDistinct({ gegner: spiele.gegner })
+		.from(spiele)
+		.orderBy(spiele.gegner);
+	return zeilen.map((z) => z.gegner);
+}
+
+export type NamensErgebnis =
+	| { ok: true; gegner: string }
+	| { ok: false; vorschlag: { eingegeben: string; vorhanden: string } };
+
+/**
+ * Vereinheitlicht den eingegebenen Gegnernamen gegen die vorhandenen Namen.
+ * Exakte Treffer (nach Normalisierung) werden automatisch übernommen; bei
+ * ähnlichen Treffern entscheidet der Verwalter über `namensEntscheidung`
+ * ('vorhanden' | 'neu'), fehlt sie, kommt ein Vorschlag zur Rückfrage zurück.
+ * Der vorgeschlagene Name wird immer serverseitig neu ermittelt.
+ * Beim Ändern bleibt der Name des bearbeiteten Spiels bewusst in der Liste.
+ */
+export async function gegnerVereinheitlichen(
+	eingegeben: string,
+	namensEntscheidung: string
+): Promise<NamensErgebnis> {
+	const treffer = findeAehnlichenVerein(eingegeben, await vorhandeneGegner());
+
+	if (treffer.art === 'exakt') return { ok: true, gegner: treffer.name };
+	if (treffer.art === 'keiner') return { ok: true, gegner: eingegeben };
+
+	if (namensEntscheidung === 'vorhanden') return { ok: true, gegner: treffer.name };
+	if (namensEntscheidung === 'neu') return { ok: true, gegner: eingegeben };
+	return { ok: false, vorschlag: { eingegeben, vorhanden: treffer.name } };
 }
 
 /**

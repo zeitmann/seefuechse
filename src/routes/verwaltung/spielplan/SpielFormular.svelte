@@ -15,6 +15,8 @@
 		wettbewerbe,
 		heimAuswaertsWerte,
 		fehler,
+		vorschlag,
+		vereinsnamen,
 		absendeText,
 		onerfolg,
 		onabbrechen
@@ -25,6 +27,8 @@
 		wettbewerbe: readonly string[];
 		heimAuswaertsWerte: readonly string[];
 		fehler: string | null;
+		vorschlag: { eingegeben: string; vorhanden: string } | null;
+		vereinsnamen: string[];
 		absendeText: string;
 		onerfolg: () => void;
 		onabbrechen: () => void;
@@ -42,9 +46,24 @@
 	// sonst taucht eine alte Meldung beim erneuten Aufklappen wieder auf.
 	let abgeschickt = $state(false);
 	let sendet = $state(false);
+	// Ändert der Nutzer nach einer Rückfrage das Gegner-Feld, verschwindet der Hinweis.
+	let gegnerGeaendert = $state(false);
+
+	const zeigeVorschlag = $derived(abgeschickt && vorschlag !== null && !gegnerGeaendert);
+
+	// Eindeutige ID für die Datalist, falls mehrere Formulare gemountet sind.
+	const formularId = $props.id();
+	const listenId = `vereinsnamen-${formularId}`;
+
+	// Solange die Rückfrage offen ist, wäre der erste Submit-Button ('Ja, … verwenden')
+	// der Standard-Button für Enter – eine Entscheidung, die niemand getroffen hat.
+	function enterAbfangen(e: KeyboardEvent) {
+		if (zeigeVorschlag && e.key === 'Enter') e.preventDefault();
+	}
 
 	const absenden: SubmitFunction = async (eingabe) => {
 		abgeschickt = true;
+		gegnerGeaendert = false;
 		sendet = true;
 		const nachher = await mitNeuladenBeiFehler(eingabe);
 		return async (ergebnis) => {
@@ -69,7 +88,14 @@
 
 	<label class="feld">
 		<span class="feld-label">Datum</span>
-		<input class="feld-input" name="datum" type="date" bind:value={datum} required />
+		<input
+			class="feld-input"
+			name="datum"
+			type="date"
+			bind:value={datum}
+			onkeydown={enterAbfangen}
+			required
+		/>
 	</label>
 
 	<label class="feld">
@@ -79,12 +105,32 @@
 			name="gegner"
 			type="text"
 			bind:value={gegner}
+			oninput={() => (gegnerGeaendert = true)}
+			onkeydown={enterAbfangen}
+			list={listenId}
 			minlength="2"
 			maxlength="60"
 			autocomplete="off"
 			required
 		/>
+		<datalist id={listenId}>
+			{#each vereinsnamen as name (name)}
+				<option value={name}></option>
+			{/each}
+		</datalist>
 	</label>
+
+	{#if zeigeVorschlag && vorschlag}
+		<div class="vorschlag" role="alert">
+			<p class="vorschlag-text">Meintest du „{vorschlag.vorhanden}“?</p>
+			<button type="submit" name="namensEntscheidung" value="vorhanden" class="btn-primaer">
+				Ja, {vorschlag.vorhanden} verwenden
+			</button>
+			<button type="submit" name="namensEntscheidung" value="neu" class="btn-sekundaer">
+				Nein, „{vorschlag.eingegeben}“ ist ein neuer Verein
+			</button>
+		</div>
+	{/if}
 
 	<div class="feld-reihe">
 		<label class="feld">
@@ -159,6 +205,27 @@
 	.feld-input:focus {
 		outline: none;
 		border-color: var(--color-accent);
+	}
+
+	.vorschlag {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+		padding: 10px 12px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-warning);
+		background: var(--color-warning-muted);
+	}
+
+	.vorschlag-text {
+		margin: 0;
+		font-size: 14px;
+		font-weight: 600;
+	}
+
+	.vorschlag button {
+		text-align: left;
 	}
 
 	.form-aktionen {

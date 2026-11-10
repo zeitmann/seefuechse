@@ -28,6 +28,10 @@
 		return form?.fehler && form.ziel === ziel ? form.fehler : null;
 	}
 
+	function vorschlagFuer(ziel: string) {
+		return form?.vorschlag && form.ziel === ziel ? form.vorschlag : null;
+	}
+
 	function neuUmschalten() {
 		neuOffen = !neuOffen;
 		if (neuOffen) bearbeiteteId = null;
@@ -42,6 +46,18 @@
 	</header>
 
 	<main class="main-content">
+		{#if data.schreibvarianten.length > 0}
+			<aside class="varianten-hinweis">
+				<p class="varianten-titel">Mögliche Schreibvarianten:</p>
+				<ul class="varianten-liste">
+					{#each data.schreibvarianten as [erster, zweiter] (`${erster}|${zweiter}`)}
+						<li>„{erster}“ und „{zweiter}“</li>
+					{/each}
+				</ul>
+				<p class="varianten-tipp">Zusammenführen über „Bearbeiten“ am jeweiligen Spiel.</p>
+			</aside>
+		{/if}
+
 		<section class="section">
 			{#if neuOffen}
 				<Card>
@@ -57,6 +73,8 @@
 						wettbewerbe={data.wettbewerbe}
 						heimAuswaertsWerte={data.heimAuswaertsWerte}
 						fehler={fehlerFuer('neu')}
+						vorschlag={vorschlagFuer('neu')}
+						vereinsnamen={data.vereinsnamen}
 						absendeText="Anlegen"
 						onerfolg={() => (neuOffen = false)}
 						onabbrechen={() => (neuOffen = false)}
@@ -93,6 +111,8 @@
 								vergangen={spiel.datum < heute}
 								bearbeiten={bearbeiteteId === spiel.id}
 								fehler={fehlerFuer(spiel.id)}
+								vorschlag={vorschlagFuer(spiel.id)}
+								vereinsnamen={data.vereinsnamen}
 								wettbewerbe={data.wettbewerbe}
 								heimAuswaertsWerte={data.heimAuswaertsWerte}
 								onbearbeiten={() => {
@@ -164,6 +184,30 @@
 		color: #fff;
 		font-size: 12px;
 		font-weight: 700;
+	}
+
+	.varianten-hinweis {
+		padding: 12px 14px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+		background: var(--color-warning-muted);
+		font-size: 13px;
+	}
+
+	.varianten-titel {
+		margin: 0 0 4px;
+		font-weight: 600;
+		color: var(--color-warning);
+	}
+
+	.varianten-liste {
+		margin: 0;
+		padding-left: 18px;
+	}
+
+	.varianten-tipp {
+		margin: 6px 0 0;
+		color: var(--color-text-muted);
 	}
 
 	.btn-neu {

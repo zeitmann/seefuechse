@@ -12,6 +12,8 @@
 		vergangen,
 		bearbeiten,
 		fehler,
+		vorschlag,
+		vereinsnamen,
 		wettbewerbe,
 		heimAuswaertsWerte,
 		onbearbeiten,
@@ -21,6 +23,8 @@
 		vergangen: boolean;
 		bearbeiten: boolean;
 		fehler: string | null;
+		vorschlag: { eingegeben: string; vorhanden: string } | null;
+		vereinsnamen: string[];
 		wettbewerbe: readonly string[];
 		heimAuswaertsWerte: readonly string[];
 		onbearbeiten: () => void;
@@ -65,6 +69,8 @@
 			{wettbewerbe}
 			{heimAuswaertsWerte}
 			{fehler}
+			{vorschlag}
+			{vereinsnamen}
 			absendeText="Speichern"
 			onerfolg={onschliessen}
 			onabbrechen={onschliessen}

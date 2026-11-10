@@ -7,11 +7,15 @@ import { alsAktionsFehler } from '$lib/server/aktionen';
 import {
 	HEIM_AUSWAERTS_WERTE,
 	WETTBEWERBE,
+	gegnerVereinheitlichen,
 	spielAendern,
 	spielAnlegen,
 	spielEingabePruefen,
-	spielLoeschen
+	spielLoeschen,
+	vorhandeneGegner,
+	type SpielDaten
 } from '$lib/server/spiele';
+import { findeSchreibvarianten } from '$lib/server/vereinsnamen';
 import type { PageServerLoad, Actions } from './$types';
 
 /**
@@ -35,6 +39,20 @@ function fehlerMitZiel(e: unknown, ziel: string) {
 	return fail(ergebnis.status, { ...ergebnis.data, ziel });
 }
 
+/**
+ * Ersetzt den Gegner durch den kanonischen Namen. Bei einem ähnlichen Treffer
+ * ohne Entscheidung des Verwalters kommt stattdessen fail(409) mit Vorschlag
+ * und den Formularwerten zurück – es wird nichts gespeichert.
+ */
+async function mitKanonischemGegner(daten: SpielDaten, form: FormData, ziel: string) {
+	const entscheidung = String(form.get('namensEntscheidung') ?? '');
+	const ergebnis = await gegnerVereinheitlichen(daten.gegner, entscheidung);
+	if (!ergebnis.ok) {
+		return { fehlschlag: fail(409, { ziel, werte: daten, vorschlag: ergebnis.vorschlag }) };
+	}
+	return { daten: { ...daten, gegner: ergebnis.gegner } };
+}
+
 export const load: PageServerLoad = async ({ locals }) => {
 	await verwaltungPruefen(locals);
 
@@ -49,8 +67,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(spiele)
 		.orderBy(asc(spiele.datum), asc(spiele.gegner));
 
+	const vereinsnamen = await vorhandeneGegner();
+
 	return {
 		spiele: alleSpiele,
+		vereinsnamen,
+		schreibvarianten: findeSchreibvarianten(vereinsnamen),
 		wettbewerbe: WETTBEWERBE,
 		heimAuswaertsWerte: HEIM_AUSWAERTS_WERTE
 	};
@@ -60,11 +82,15 @@ export const actions: Actions = {
 	spielAnlegen: async ({ request, locals }) => {
 		await verwaltungPruefen(locals);
 
-		const pruefung = spielEingabePruefen(await request.formData());
+		const form = await request.formData();
+		const pruefung = spielEingabePruefen(form);
 		if (!pruefung.ok) return fail(400, { fehler: pruefung.fehler, ziel: 'neu' });
 
+		const kanonisch = await mitKanonischemGegner(pruefung.daten, form, 'neu');
+		if ('fehlschlag' in kanonisch) return kanonisch.fehlschlag;
+
 		try {
-			await spielAnlegen(pruefung.daten);
+			await spielAnlegen(kanonisch.daten);
 		} catch (e) {
 			return fehlerMitZiel(e, 'neu');
 		}
@@ -81,8 +107,11 @@ export const actions: Actions = {
 		const pruefung = spielEingabePruefen(form);
 		if (!pruefung.ok) return fail(400, { fehler: pruefung.fehler, ziel: spielId });
 
+		const kanonisch = await mitKanonischemGegner(pruefung.daten, form, spielId);
+		if ('fehlschlag' in kanonisch) return kanonisch.fehlschlag;
+
 		try {
-			await spielAendern(spielId, pruefung.daten);
+			await spielAendern(spielId, kanonisch.daten);
 		} catch (e) {
 			return fehlerMitZiel(e, spielId);
 		}
