@@ -173,7 +173,7 @@ Mockups dazu liegen unter `mockups/`.
 - **Verwaltung** (`/verwaltung`) – für Admin/Vorstand: Freischaltung wartender Mitglieder, Spielplan-Sync (Button, letzter Lauf, Stichtag bestätigter Anstoßzeiten), Links zu Spielplan- und Rollenverwaltung; die Dauerkarten-Zuordnung ist noch Platzhaltertext
 - **Verwaltung → Spielplan** (`/verwaltung/spielplan`) – Spiele anlegen, bearbeiten, löschen; Erkennung ähnlicher Vereinsnamen
 - **Verwaltung → Rollen verwalten** (`/verwaltung/rollen`) – nur Admin: Rolle zuweisen, Name/E-Mail ändern, Passwort-Mail senden
-- **Login, Registrieren, Passwort ändern, Warten** (`/login`, `/registrieren`, `/passwort-aendern`, `/warten`) – Auth-Seiten; `/warten` sehen Mitglieder mit Status `ausstehend`
+- **Login, Registrieren, Warten** (`/login`, `/registrieren`, `/warten`) – Auth-Seiten; `/warten` sehen Mitglieder mit Status `ausstehend`
 - **Passwort vergessen** (`/passwort-vergessen` → Mail → `/auth/callback?next=/passwort-neu` → `/passwort-neu`) – Reset-Link anfordern (neutrale Antwort), Callback tauscht `code` bzw. `token_hash` gegen eine Session, danach neues Passwort setzen
 - **Cron-Endpoint** (`POST /api/cron/spielplan-sync`) – kein Seitenaufruf, wird von der Netlify Scheduled Function per Token aufgerufen
 
@@ -214,7 +214,7 @@ seefuechse/
 ├── src/
 │   ├── routes/
 │   │   ├── +page.svelte        # Start-Dashboard
-│   │   ├── login/, registrieren/, logout/, warten/, passwort-aendern/
+│   │   ├── login/, registrieren/, logout/, warten/
 │   │   ├── passwort-vergessen/, passwort-neu/
 │   │   ├── auth/callback/      # Einstieg aus Auth-Mails (code / token_hash)
 │   │   ├── spielplan/          # Liste

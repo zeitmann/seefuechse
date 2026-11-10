@@ -2,13 +2,11 @@ import { createServerClient } from '@supabase/ssr';
 import { redirect, type Handle } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
-// '/passwort-aendern' ist testweise öffentlich: Der Reset-Link aus der
-// Supabase-Mail wird ohne reguläre Session aufgerufen – die Recovery-Session
-// entsteht erst clientseitig aus dem URL-Fragment.
+// '/auth/callback' tauscht den Link aus Auth-Mails gegen eine Session und muss
+// daher ohne bestehende Session erreichbar sein.
 const PUBLIC_ROUTES = [
 	'/login',
 	'/registrieren',
-	'/passwort-aendern',
 	'/passwort-vergessen',
 	'/auth/callback'
 ];
