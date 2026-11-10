@@ -117,7 +117,15 @@ export const spiele = pgTable('spiele', {
 	// true = von Hand gepflegt, der OpenLigaDB-Sync überschreibt das Spiel nicht
 	manuellUeberschrieben: boolean('manuell_ueberschrieben').notNull().default(false),
 	// lastUpdateDateTime aus OpenLigaDB beim letzten übernommenen Stand
-	openligadbAktualisiertAm: timestamp('openligadb_aktualisiert_am', { withTimezone: true })
+	openligadbAktualisiertAm: timestamp('openligadb_aktualisiert_am', { withTimezone: true }),
+	// Runde/Spieltag aus OpenLigaDB (group.groupName), z. B. '10. Spieltag' oder
+	// 'Achtelfinale'; null = unbekannt
+	runde: text('runde'),
+	// Endergebnis: Tore des Heimteams bzw. Gastteams in Stadion-Reihenfolge – NICHT
+	// aus Freiburg-Sicht (anders als heim_auswaerts). Beide null = noch kein
+	// Endergebnis; ein CHECK in der Datenbank erzwingt "beide gesetzt oder beide null".
+	toreHeimteam: integer('tore_heimteam'),
+	toreGastteam: integer('tore_gastteam')
 });
 
 export const freigaben = pgTable('freigaben', {

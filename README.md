@@ -91,6 +91,9 @@ erDiagram
     string openligadb_id
     boolean manuell_ueberschrieben
     timestamp openligadb_aktualisiert_am
+    string runde "optional"
+    int tore_heimteam "optional"
+    int tore_gastteam "optional"
   }
   FREIGABEN {
     uuid id PK
@@ -137,7 +140,7 @@ Alle Tabellen in Kürze:
 - **rollen** – verfügbare Rollen (Admin, Vorstand, Mitglied)
 - **mitglied_rollen** – Verknüpfungstabelle Mitglied ↔ Rolle (many-to-many)
 - **dauerkarten** – die 12 Dauerkarten + 2 Fanclubkarten, jeweils einem Besitzer zugeordnet; `bezeichnung` unterscheidet mehrere Karten (z. B. „DK 1", „Fanclubkarte 1"); alle Karten liegen im selben Block, daher kein Block/Reihe, `platz` ist optional
-- **spiele** – Spielplan mit Datum und Anstoßzeit (`uhrzeit`, null = unbekannt); `openligadb_id` verknüpft das Spiel mit OpenLigaDB, `manuell_ueberschrieben` schützt Handkorrekturen vor dem Sync
+- **spiele** – Spielplan mit Datum und Anstoßzeit (`uhrzeit`, null = unbekannt); `openligadb_id` verknüpft das Spiel mit OpenLigaDB, `manuell_ueberschrieben` schützt Handkorrekturen vor dem Sync; `runde` (z. B. „10. Spieltag", „Achtelfinale") und das Endergebnis `tore_heimteam`/`tore_gastteam` (Stadion-Reihenfolge, beide null = noch kein Ergebnis) kommen aus dem Sync
 - **freigaben** – verknüpft eine Dauerkarte mit einem Spiel, sobald sie freigegeben wird
 - **bewerbungen** – Bewerbungen von Mitgliedern auf eine Freigabe (eine pro Mitglied und Freigabe)
 - **interesse** – Interessensbekundung eines Mitglieds für ein Spiel, unabhängig von einer Freigabe (eine pro Mitglied und Spiel)
@@ -259,8 +262,9 @@ Spielplan und Anstoßzeiten kommen aus der kostenlosen OpenLigaDB-API (`https://
 - **Saisonwechsel:** `AKTUELLE_SAISON` und die Liga-Kürzel in `LIGEN` müssen jährlich angepasst und gegen OpenLigaDB geprüft werden.
 - **Anstoßzeit:** wird in der Spalte `spiele.uhrzeit` gespeichert (deutsche Ortszeit, null = unbekannt).
 - **„vorläufig":** Die DFL legt Bundesliga-Anstoßzeiten in Etappen fest, bis dahin steht in OpenLigaDB der Standard-Slot. Die App leitet zur Laufzeit ab, welche Bundesliga-Zeiten noch nicht bestätigt sind, und kennzeichnet sie im Spielplan als „vorläufig" (`spielplanTermine.ts`). Die Verwaltung zeigt „Anstoßzeiten bestätigt bis: …".
-- **Schreibweg:** Upsert per `openligadb_id`. Ein bestehendes Spiel wird nur überschrieben, wenn sich Datum, Uhrzeit, Gegner, Wettbewerb oder Heim/Auswärts geändert haben. Spiele, die in der API fehlen, werden nie gelöscht.
-- **Schutz manueller Änderungen:** Wird ein synchronisiertes Spiel in `/verwaltung/spielplan` fachlich geändert, setzt die App `manuell_ueberschrieben = true`; der Sync lässt dieses Spiel dann in Ruhe. Zurücksetzen geht bisher nur per SQL. Von Hand angelegte Spiele ohne `openligadb_id` erkennt der Sync nicht – daher zuerst syncen, dann ergänzen.
+- **Runde und Ergebnis:** `runde` = `group.groupName`. Das Endergebnis wird nur übernommen, wenn `matchIsFinished` true ist und `matchResults` einen Eintrag mit `resultTypeID` 2 enthält: `tore_heimteam` = `pointsTeam1`, `tore_gastteam` = `pointsTeam2` (Stadion-Reihenfolge, nicht Freiburg-Sicht). Fehlen die Felder, bleiben die Werte null; das Spiel wird trotzdem übernommen.
+- **Schreibweg:** Upsert per `openligadb_id`. Ein bestehendes Spiel wird nur überschrieben, wenn sich Datum, Uhrzeit, Gegner, Wettbewerb oder Heim/Auswärts geändert haben. Runde und Ergebnis bestehender Spiele schreibt danach ein eigenes, bedingtes UPDATE (nur bei Änderung); es läuft auch bei manuell geänderten Spielen und lässt `openligadb_aktualisiert_am` unverändert. Spiele, die in der API fehlen, werden nie gelöscht.
+- **Schutz manueller Änderungen:** Wird ein synchronisiertes Spiel in `/verwaltung/spielplan` fachlich geändert, setzt die App `manuell_ueberschrieben = true`; der Sync lässt Termin, Gegner, Wettbewerb und Heim/Auswärts dieses Spiels dann in Ruhe (Runde und Ergebnis werden weiter aktualisiert). Zurücksetzen geht bisher nur per SQL. Von Hand angelegte Spiele ohne `openligadb_id` erkennt der Sync nicht – daher zuerst syncen, dann ergänzen.
 - **Ablauf automatisch:** Die Netlify Scheduled Function `netlify/functions/spielplan-sync-taeglich.mts` läuft täglich um 04:00 UTC und ruft per `POST /api/cron/spielplan-sync` mit `Authorization: Bearer <CRON_SECRET>` den Endpoint auf. Der Endpoint führt den Sync aus und schreibt das Ergebnis in `sync_laeufe`. Scheduled Functions laufen nur auf dem Production-Deploy.
 - **Ablauf manuell:** Der Button „Synchronisieren" in `/verwaltung` startet denselben Lauf (Quelle `manuell`) und zeigt das Ergebnis inkl. verschobener Termine.
 - **Fehler:** Schlägt eine Liga fehl (Timeout 8 s je Abruf), laufen die anderen weiter; der Lauf wird als fehlgeschlagen protokolliert und die Verwaltung zeigt eine Warnung.

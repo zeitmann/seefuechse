@@ -42,13 +42,24 @@ const LIGEN: { kuerzel: string; wettbewerb: Wettbewerb }[] = [
 	{ kuerzel: 'uecl{saison}', wettbewerb: 'Conference League' }
 ];
 
-/** Der für uns relevante Ausschnitt eines Spiels aus getmatchdata. */
+/** resultTypeID des Endergebnisses in matchResults (1 = Halbzeit). */
+const ERGEBNISTYP_ENDERGEBNIS = 2;
+
+/**
+ * Der für uns relevante Ausschnitt eines Spiels aus getmatchdata. group,
+ * matchIsFinished und matchResults sind optional und werden nur weich geprüft:
+ * fehlen sie oder passen sie nicht, bleiben Runde bzw. Ergebnis null – das
+ * Spiel selbst wird trotzdem übernommen.
+ */
 type OpenLigaSpiel = {
 	matchID: number;
 	matchDateTime: string;
 	lastUpdateDateTime: string | null;
 	team1: { teamName: string };
 	team2: { teamName: string };
+	group?: { groupName?: string };
+	matchIsFinished?: boolean;
+	matchResults?: Array<{ resultTypeID: number; pointsTeam1: number; pointsTeam2: number }>;
 };
 
 type SpielZeile = {
@@ -59,6 +70,11 @@ type SpielZeile = {
 	wettbewerb: Wettbewerb;
 	heimAuswaerts: HeimAuswaerts;
 	aktualisiertAm: string | null;
+	runde: string | null;
+	/** Tore team1 (Heimteam im Stadion), null = kein Endergebnis */
+	toreHeimteam: number | null;
+	/** Tore team2 (Gastteam im Stadion), null = kein Endergebnis */
+	toreGastteam: number | null;
 };
 
 export type TerminAenderung = {
@@ -77,6 +93,11 @@ export type SyncErgebnis = {
 	abrufFehler: number;
 	/** Spiele mit verschobenem Datum/Anpfiff – Grundlage für spätere Benachrichtigungen. */
 	terminAenderungen: TerminAenderung[];
+	/**
+	 * Bestehende Spiele, bei denen sich Runde oder Endergebnis geändert hat
+	 * (unabhängig von neu/geaendert/unveraendert, die nur die Terminfelder betreffen).
+	 */
+	ergebnisseAktualisiert: number;
 };
 
 // 'JJJJ-MM-TTTHH:MM:SS' – bereits deutsche Ortszeit, daher reiner String-Split.
@@ -91,7 +112,38 @@ function istOpenLigaSpiel(wert: unknown): wert is OpenLigaSpiel {
 		typeof s.matchDateTime === 'string' &&
 		typeof s.team1?.teamName === 'string' &&
 		typeof s.team2?.teamName === 'string'
+		// group, matchIsFinished und matchResults bewusst NICHT prüfen: Sie sind
+		// optional und werden in rundeLesen/ergebnisLesen weich ausgewertet.
 	);
+}
+
+/** group.groupName getrimmt; null, wenn fehlend, leer oder kein String. */
+function rundeLesen(spiel: OpenLigaSpiel): string | null {
+	const name: unknown = spiel.group?.groupName;
+	if (typeof name !== 'string') return null;
+	return leerzeichenBereinigen(name) || null;
+}
+
+function istToranzahl(wert: unknown): wert is number {
+	return typeof wert === 'number' && Number.isInteger(wert) && wert >= 0;
+}
+
+/**
+ * Endergebnis in Stadion-Reihenfolge (team1 = Heimteam). Nur bei
+ * matchIsFinished === true und vorhandenem Endergebnis-Eintrag, sonst beide null.
+ */
+function ergebnisLesen(spiel: OpenLigaSpiel): { heim: number; gast: number } | null {
+	if (spiel.matchIsFinished !== true || !Array.isArray(spiel.matchResults)) return null;
+	const ende: unknown = spiel.matchResults.find(
+		(r: unknown) =>
+			typeof r === 'object' &&
+			r !== null &&
+			(r as { resultTypeID?: unknown }).resultTypeID === ERGEBNISTYP_ENDERGEBNIS
+	);
+	if (!ende) return null;
+	const { pointsTeam1, pointsTeam2 } = ende as { pointsTeam1?: unknown; pointsTeam2?: unknown };
+	if (!istToranzahl(pointsTeam1) || !istToranzahl(pointsTeam2)) return null;
+	return { heim: pointsTeam1, gast: pointsTeam2 };
 }
 
 /** Wandelt ein API-Spiel in eine Zeile um; null, wenn Freiburg nicht beteiligt ist. */
@@ -102,6 +154,8 @@ function alsSpielZeile(spiel: OpenLigaSpiel, wettbewerb: Wettbewerb): SpielZeile
 	const zeitpunkt = ZEITPUNKT_MUSTER.exec(spiel.matchDateTime);
 	if (!zeitpunkt) return null;
 
+	const ergebnis = ergebnisLesen(spiel);
+
 	return {
 		openligadbId: String(spiel.matchID),
 		datum: zeitpunkt[1],
@@ -109,7 +163,10 @@ function alsSpielZeile(spiel: OpenLigaSpiel, wettbewerb: Wettbewerb): SpielZeile
 		gegner: leerzeichenBereinigen(istHeim ? spiel.team2.teamName : spiel.team1.teamName),
 		wettbewerb,
 		heimAuswaerts: istHeim ? 'heim' : 'auswaerts',
-		aktualisiertAm: spiel.lastUpdateDateTime || null
+		aktualisiertAm: spiel.lastUpdateDateTime || null,
+		runde: rundeLesen(spiel),
+		toreHeimteam: ergebnis?.heim ?? null,
+		toreGastteam: ergebnis?.gast ?? null
 	};
 }
 
@@ -198,7 +255,8 @@ export async function synchronisiereSpielplan(saison: number): Promise<SyncErgeb
 		uebersprungenManuell: 0,
 		hinweise,
 		abrufFehler: jeLiga.filter((liga) => liga === null).length,
-		terminAenderungen: []
+		terminAenderungen: [],
+		ergebnisseAktualisiert: 0
 	};
 	if (zeilen.length === 0) return ergebnis;
 
@@ -227,6 +285,10 @@ export async function synchronisiereSpielplan(saison: number): Promise<SyncErgeb
 				gegner: z.gegner,
 				wettbewerb: z.wettbewerb,
 				heimAuswaerts: z.heimAuswaerts,
+				// Nur beim Insert wirksam; bestehende Spiele aktualisiert rundeUndErgebnisSchreiben.
+				runde: z.runde,
+				toreHeimteam: z.toreHeimteam,
+				toreGastteam: z.toreGastteam,
 				// OpenLigaDB liefert den Zeitstempel ohne Zone in deutscher Ortszeit.
 				openligadbAktualisiertAm: z.aktualisiertAm
 					? sql`(${z.aktualisiertAm}::timestamp at time zone 'Europe/Berlin')`
@@ -279,7 +341,50 @@ export async function synchronisiereSpielplan(saison: number): Promise<SyncErgeb
 		else ergebnis.unveraendert++;
 	}
 
+	// Erst nach dem Upsert: Neu eingefügte Spiele haben Runde/Ergebnis dann schon
+	// und werden hier nicht noch einmal gezählt.
+	ergebnis.ergebnisseAktualisiert = await rundeUndErgebnisSchreiben(zeilen);
+
 	return ergebnis;
+}
+
+/**
+ * Aktualisiert Runde und Endergebnis bestehender synchronisierter Spiele – in
+ * EINEM bedingten `update … from (values …)`. Anders als der Upsert bewusst
+ * auch bei manuell_ueberschrieben = true: Für Runde und Ergebnis ist OpenLigaDB
+ * die Quelle, das Flag schützt nur die Terminfelder. Geschrieben wird nur, wenn sich mindestens
+ * ein Wert unterscheidet (IS DISTINCT FROM); openligadb_aktualisiert_am und
+ * manuell_ueberschrieben bleiben unangetastet, damit die "vorläufig"-Heuristik
+ * (spielplanTermine.ts) nicht verfälscht wird. Spiele ohne openligadb_id
+ * (Testspiele) treffen die Join-Bedingung nie.
+ *
+ * Rückgabe: Anzahl tatsächlich geänderter Spiele.
+ */
+async function rundeUndErgebnisSchreiben(zeilen: SpielZeile[]): Promise<number> {
+	if (zeilen.length === 0) return 0;
+
+	const werte = sql.join(
+		zeilen.map(
+			(z) =>
+				sql`(${z.openligadbId}::text, ${z.runde}::text, ${z.toreHeimteam}::integer, ${z.toreGastteam}::integer)`
+		),
+		sql`, `
+	);
+
+	// postgres-js liefert die returning-Zeilen als Array.
+	const geaendert = await db.execute(sql`
+		update ${spiele}
+		set runde = neu.runde,
+			tore_heimteam = neu.tore_heimteam,
+			tore_gastteam = neu.tore_gastteam
+		from (values ${werte}) as neu (openligadb_id, runde, tore_heimteam, tore_gastteam)
+		where ${spiele.openligadbId} = neu.openligadb_id
+			and (${spiele.runde}, ${spiele.toreHeimteam}, ${spiele.toreGastteam})
+				is distinct from
+				(neu.runde, neu.tore_heimteam, neu.tore_gastteam)
+		returning ${spiele.id}
+	`);
+	return geaendert.length;
 }
 
 export type SyncQuelle = 'cron' | 'manuell';
@@ -314,6 +419,7 @@ export async function fuehreSyncMitProtokollAus(quelle: SyncQuelle): Promise<Pro
 			hinweise: [`Sync abgebrochen: ${fehlerText(e)}`],
 			abrufFehler: 0,
 			terminAenderungen: [],
+			ergebnisseAktualisiert: 0,
 			erfolgreich: false
 		};
 	}
