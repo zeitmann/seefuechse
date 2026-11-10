@@ -74,12 +74,19 @@
 				<p class="placeholder-text">Folgt im nächsten Schritt.</p>
 			</section>
 
+			<section class="section">
+				<div class="section-header">
+					<h2>Spielplan</h2>
+				</div>
+				<a class="verwaltungs-link" href="/verwaltung/spielplan">Spielplan verwalten</a>
+			</section>
+
 			{#if data.istAdmin}
 				<section class="section">
 					<div class="section-header">
 						<h2>Administration</h2>
 					</div>
-					<a class="rollen-link" href="/verwaltung/rollen">Rollen verwalten</a>
+					<a class="verwaltungs-link" href="/verwaltung/rollen">Rollen verwalten</a>
 				</section>
 			{/if}
 		{/if}
@@ -248,7 +255,7 @@
 		color: var(--color-text-muted);
 	}
 
-	.rollen-link {
+	.verwaltungs-link {
 		display: inline-flex;
 		align-items: center;
 		padding: 10px 16px;
@@ -264,7 +271,7 @@
 			color 0.15s;
 	}
 
-	.rollen-link:hover {
+	.verwaltungs-link:hover {
 		border-color: var(--color-text-muted);
 		color: var(--color-accent);
 	}
