@@ -1,7 +1,7 @@
 // src/lib/server/spielplanSync.ts
 //
 // Übernimmt den Spielplan des SC Freiburg aus OpenLigaDB in die Tabelle `spiele`.
-// Ausgelöst täglich per Netlify Scheduled Function (über /api/cron/spielplan-sync)
+// Ausgelöst per Netlify Scheduled Function (04:00 UTC und stündlich 12–23 UTC, über /api/cron/spielplan-sync)
 // und manuell per Button in /verwaltung; jeder Lauf wird in sync_laeufe protokolliert.
 
 import { and, eq, inArray, lt, sql } from 'drizzle-orm';

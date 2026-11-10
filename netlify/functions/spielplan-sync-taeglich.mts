@@ -1,6 +1,8 @@
 // netlify/functions/spielplan-sync-taeglich.mts
 //
-// Netlify Scheduled Function: stößt täglich den Spielplan-Sync der App an.
+// Netlify Scheduled Function: stößt den Spielplan-Sync der App an (04:00 UTC und
+// stündlich 12–23 UTC). Der Dateiname "taeglich" ist historisch (früher ein Lauf
+// pro Tag); er bleibt, weil er den Funktionsnamen bei Netlify festlegt.
 // Bewusst ohne Imports aus src/ – die eigentliche Logik läuft im SvelteKit-
 // Endpoint /api/cron/spielplan-sync, abgesichert per CRON_SECRET.
 
@@ -45,5 +47,7 @@ export default async () => {
 	}
 };
 
-// Täglich 04:00 UTC = 05:00 (Winter) bzw. 06:00 Uhr (Sommer) deutscher Zeit
-export const config = { schedule: '0 4 * * *' };
+// 04:00 UTC (nachts, Spielplan/Anstoßzeiten) plus stündlich 12:00–23:00 UTC, damit
+// Ergebnisse am Spieltag zeitnah erscheinen. Deutsche Zeit: 05:00 und 13:00–00:00
+// Uhr (Winter) bzw. 06:00 und 14:00–01:00 Uhr (Sommer). 13 Läufe pro Tag.
+export const config = { schedule: '0 4,12-23 * * *' };

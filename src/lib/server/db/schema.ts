@@ -249,7 +249,7 @@ export const benachrichtigungEinstellungen = pgTable(
 );
 
 /**
- * Protokoll der Spielplan-Syncs (täglicher Cron und Button in /verwaltung).
+ * Protokoll der Spielplan-Syncs (Cron 04:00 UTC und stündlich 12–23 UTC, Button in /verwaltung).
  * Nur Abbild der manuell angelegten DB-Tabelle: der CHECK auf `quelle` und der
  * Index sync_laeufe_gestartet_am_idx existieren nur in der Datenbank.
  */

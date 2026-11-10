@@ -84,7 +84,7 @@ Code: `src/lib/server/spielplanSync.ts` (`synchronisiereSpielplan(saison)`, `fue
 
 ### Automatischer Lauf
 
-- Netlify Scheduled Function `netlify/functions/spielplan-sync-taeglich.mts`, Zeitplan `0 4 * * *` (UTC, also 05:00 bzw. 06:00 Uhr deutscher Zeit). Sie hat keine Imports aus `src/` und ruft nur per `fetch` den Endpoint auf (Basis-URL aus `process.env.URL`, sonst `SITE_BASE_URL`, Timeout 25 s).
+- Netlify Scheduled Function `netlify/functions/spielplan-sync-taeglich.mts`, Zeitplan `0 4,12-23 * * *` (UTC): 04:00 und stündlich 12:00–23:00, 13 Läufe pro Tag, damit Ergebnisse am Spieltag zeitnah ankommen (deutsche Zeit 05:00 und 13:00–00:00 Uhr im Winter, 06:00 und 14:00–01:00 Uhr im Sommer). Der Dateiname `…-taeglich` ist historisch; nicht umbenennen, er bestimmt den Funktionsnamen bei Netlify. Sie hat keine Imports aus `src/` und ruft nur per `fetch` den Endpoint auf (Basis-URL aus `process.env.URL`, sonst `SITE_BASE_URL`, Timeout 25 s).
 - Endpoint `POST /api/cron/spielplan-sync` erwartet `Authorization: Bearer <CRON_SECRET>`. Fehlt das Secret: 503. Falsches oder fehlendes Token: 401. Andere HTTP-Methoden: 405. Vergleich zeitkonstant über SHA-256 (Web Crypto, ohne `@types/node`). Danach `fuehreSyncMitProtokollAus('cron')`.
 - Der Button in `/verwaltung` ruft dieselbe Funktion mit `quelle = 'manuell'` auf (Rollenprüfung in der Action). Die Karte zeigt „Zuletzt synchronisiert" bzw. eine Warnung bei fehlgeschlagenem Lauf.
 - Scheduled Functions laufen nur auf dem veröffentlichten Production-Deploy, nicht auf Deploy Previews. Zum Testen in Netlify unter Functions → „Run now". Lokal: `curl -X POST -H "Authorization: Bearer …" http://localhost:5173/api/cron/spielplan-sync`.

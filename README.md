@@ -34,7 +34,7 @@ Ablauf in Kurzform: **Freigabe** durch DK-Besitzer → **Bewerbung** durch Mitgl
 
 - Frontend: SvelteKit 5 (mit Runes: `$props`, `$state`, `$effect`, `$derived`)
 - Datenbank: PostgreSQL über Supabase, Zugriff via Drizzle ORM
-- Hosting: Netlify (`adapter-netlify`, plus eine Netlify Scheduled Function für den täglichen Spielplan-Sync)
+- Hosting: Netlify (`adapter-netlify`, plus eine Netlify Scheduled Function für den regelmäßigen Spielplan-Sync)
 - Icons: `@lucide/svelte` (Nachfolger von `lucide-svelte`, welches deprecated wurde)
 - Karten: Leaflet.js (als Abhängigkeit installiert, im Code noch nicht verwendet)
 - Styling: Custom CSS, mobile-first ab 375px, Desktop begrenzt auf max. 720px
@@ -193,7 +193,7 @@ Mockups dazu liegen unter `mockups/`.
 | NavBar („Anfragen" für alle, „Dauerkarte" nur für Besitzer, „Verwaltung" nur für Admin/Vorstand) | ✅ fertig |
 | Verwaltung → Rollen verwalten | ✅ fertig |
 | Verwaltung → Spielplan pflegen (anlegen, bearbeiten, löschen) | ✅ fertig |
-| OpenLigaDB-Sync (täglich per Netlify Scheduled Function + Button in `/verwaltung`, Protokoll in `sync_laeufe`) | ✅ fertig |
+| OpenLigaDB-Sync (04:00 UTC und stündlich 12–23 UTC per Netlify Scheduled Function + Button in `/verwaltung`, Protokoll in `sync_laeufe`) | ✅ fertig |
 | In-App-Benachrichtigungen (Glocke, Liste, gelesen markieren) | ✅ fertig |
 | Benachrichtigung bei Terminänderung durch den Sync | 📋 noch nicht begonnen |
 | Web-Push | 🚧 nur vorbereitet (Tabellen, auskommentierter Service-Worker-Code) |
@@ -209,7 +209,7 @@ seefuechse/
 ├── .github/copilot-instructions.md  # Entwicklungskontext für KI-Assistenten
 ├── DB-stucture/              # ER-Diagramme (Planungsstand)
 ├── mockups/                  # Visuelle Mockups der Seiten
-├── netlify/functions/        # Scheduled Function für den täglichen Spielplan-Sync
+├── netlify/functions/        # Scheduled Function für den Spielplan-Sync (Cron)
 ├── testing/                  # Notizen zu manuellen Tests, Prozessgrafiken
 ├── tools/                    # Hilfsseite zum Erzeugen der App-Icons
 ├── src/
@@ -265,7 +265,7 @@ Spielplan und Anstoßzeiten kommen aus der kostenlosen OpenLigaDB-API (`https://
 - **Runde und Ergebnis:** `runde` = `group.groupName`. Das Endergebnis wird nur übernommen, wenn `matchIsFinished` true ist und `matchResults` einen Eintrag mit `resultTypeID` 2 enthält: `tore_heimteam` = `pointsTeam1`, `tore_gastteam` = `pointsTeam2` (Stadion-Reihenfolge, nicht Freiburg-Sicht). Fehlen die Felder, bleiben die Werte null; das Spiel wird trotzdem übernommen.
 - **Schreibweg:** Upsert per `openligadb_id`. Ein bestehendes Spiel wird nur überschrieben, wenn sich Datum, Uhrzeit, Gegner, Wettbewerb oder Heim/Auswärts geändert haben. Runde und Ergebnis bestehender Spiele schreibt danach ein eigenes, bedingtes UPDATE (nur bei Änderung); es läuft auch bei manuell geänderten Spielen und lässt `openligadb_aktualisiert_am` unverändert. Spiele, die in der API fehlen, werden nie gelöscht.
 - **Schutz manueller Änderungen:** Wird ein synchronisiertes Spiel in `/verwaltung/spielplan` fachlich geändert, setzt die App `manuell_ueberschrieben = true`; der Sync lässt Termin, Gegner, Wettbewerb und Heim/Auswärts dieses Spiels dann in Ruhe (Runde und Ergebnis werden weiter aktualisiert). Zurücksetzen geht bisher nur per SQL. Von Hand angelegte Spiele ohne `openligadb_id` erkennt der Sync nicht – daher zuerst syncen, dann ergänzen.
-- **Ablauf automatisch:** Die Netlify Scheduled Function `netlify/functions/spielplan-sync-taeglich.mts` läuft täglich um 04:00 UTC und ruft per `POST /api/cron/spielplan-sync` mit `Authorization: Bearer <CRON_SECRET>` den Endpoint auf. Der Endpoint führt den Sync aus und schreibt das Ergebnis in `sync_laeufe`. Scheduled Functions laufen nur auf dem Production-Deploy.
+- **Ablauf automatisch:** Die Netlify Scheduled Function `netlify/functions/spielplan-sync-taeglich.mts` läuft um 04:00 UTC und stündlich von 12:00 bis 23:00 UTC (Cron `0 4,12-23 * * *`, 13 Läufe pro Tag; deutsche Zeit 05:00 und 13:00–00:00 Uhr im Winter, 06:00 und 14:00–01:00 Uhr im Sommer), damit Ergebnisse am Spieltag zeitnah erscheinen. Der Dateiname `…-taeglich` ist historisch und bleibt, weil er den Funktionsnamen bei Netlify bestimmt. Sie ruft per `POST /api/cron/spielplan-sync` mit `Authorization: Bearer <CRON_SECRET>` den Endpoint auf. Der Endpoint führt den Sync aus und schreibt das Ergebnis in `sync_laeufe`. Scheduled Functions laufen nur auf dem Production-Deploy.
 - **Ablauf manuell:** Der Button „Synchronisieren" in `/verwaltung` startet denselben Lauf (Quelle `manuell`) und zeigt das Ergebnis inkl. verschobener Termine.
 - **Fehler:** Schlägt eine Liga fehl (Timeout 8 s je Abruf), laufen die anderen weiter; der Lauf wird als fehlgeschlagen protokolliert und die Verwaltung zeigt eine Warnung.
 

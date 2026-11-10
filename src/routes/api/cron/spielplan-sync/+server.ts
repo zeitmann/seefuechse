@@ -23,7 +23,7 @@ async function sindGleich(a: string, b: string): Promise<boolean> {
 }
 
 /**
- * Wird täglich von der Netlify Scheduled Function aufgerufen. Statt einer
+ * Wird von der Netlify Scheduled Function aufgerufen (04:00 UTC und stündlich 12–23 UTC). Statt einer
  * Anmeldung schützt ein Bearer-Token (CRON_SECRET); der Login-Guard in
  * hooks.server.ts nimmt genau diesen Pfad aus. Nur POST (andere Methoden: 405).
  */
