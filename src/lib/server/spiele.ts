@@ -5,7 +5,7 @@ import { freigaben, heimAuswaertsEnum, interesse, spiele } from '$lib/server/db/
 import { findeAehnlichenVerein, leerzeichenBereinigen } from '$lib/server/vereinsnamen';
 
 /** Erlaubte Wettbewerbe – exakt die Werte, nach denen /spielplan filtert. */
-export const WETTBEWERBE = ['Bundesliga', 'DFB-Pokal', 'Europa League'] as const;
+export const WETTBEWERBE = ['Bundesliga', 'DFB-Pokal', 'Europa League', 'Testspiel'] as const;
 export type Wettbewerb = (typeof WETTBEWERBE)[number];
 
 /** Enum-Werte aus dem Schema ('heim', 'auswaerts'). */

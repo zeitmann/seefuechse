@@ -6,15 +6,24 @@
 	let { data }: { data: PageData } = $props();
 
 	type Tab = 'kommend' | 'vergangen';
-	type Filter = 'alle' | 'liga' | 'pokal' | 'europa';
+	type Filter = 'alle' | 'liga' | 'pokal' | 'europa' | 'test';
 
 	let aktiveTab: Tab = $state('kommend');
 	let aktiveFilter: Filter = $state('alle');
 
+	const filterOptionen: [Filter, string][] = [
+		['alle', 'Alle'],
+		['liga', 'Liga'],
+		['pokal', 'Pokal'],
+		['europa', 'Europa'],
+		['test', 'Testspiele']
+	];
+
 	const wettbewerbMap: Record<Exclude<Filter, 'alle'>, string> = {
 		liga: 'Bundesliga',
 		pokal: 'DFB-Pokal',
-		europa: 'Europa League'
+		europa: 'Europa League',
+		test: 'Testspiel'
 	};
 
 	const gefilterteSpiele = $derived.by(() => {
@@ -36,7 +45,7 @@
 	<main class="main-content">
 		<div class="page-title">
 			<h2>Spielplan</h2>
-			<p class="subtitle">Saison 2025/26</p>
+			<p class="subtitle">Saison 2026/27</p>
 		</div>
 
 		<!-- Tab-Umschalter -->
@@ -59,11 +68,11 @@
 
 		<!-- Filter-Leiste -->
 		<div class="filter-bar">
-			{#each [['alle', 'Alle'], ['liga', 'Liga'], ['pokal', 'Pokal'], ['europa', 'Europa']] as [key, label] (key)}
+			{#each filterOptionen as [key, label] (key)}
 				<button
 					class="filter-btn"
 					class:active={aktiveFilter === key}
-					onclick={() => (aktiveFilter = key as Filter)}
+					onclick={() => (aktiveFilter = key)}
 				>
 					{label}
 				</button>
@@ -153,7 +162,8 @@
 	/* FILTER */
 	.filter-bar {
 		display: flex;
-		gap: 8px;
+		/* Knapp gehalten, damit fünf Filter auch bei 375px in eine Zeile passen */
+		gap: 6px;
 		overflow-x: auto;
 		padding-bottom: 2px;
 	}
@@ -163,7 +173,7 @@
 	}
 
 	.filter-btn {
-		padding: 6px 14px;
+		padding: 6px 10px;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-full);
 		background: transparent;
