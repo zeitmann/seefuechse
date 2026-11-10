@@ -31,7 +31,7 @@ export type SpielDaten = {
 export type PruefErgebnis = { ok: true; daten: SpielDaten } | { ok: false; fehler: string };
 
 const NICHT_MEHR_VORHANDEN = 'Dieses Spiel existiert nicht mehr.';
-const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_MUSTER =/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** 'JJJJ-MM-TT' und ein real existierender Kalendertag (kein 31.02.). */
 function istGueltigesDatum(wert: string): boolean {

@@ -168,7 +168,7 @@ Mockups dazu liegen unter `mockups/`.
 - **Meine Dauerkarte** (`/karte`) – nur für DK-Besitzer: eigene Dauerkarte je kommendem Spiel freigeben/behalten, Bewerbungen einsehen und vergeben, Anzahl Interessenten je Spiel
 - **Anfragen** (`/anfragen`) – für alle Mitglieder: eigene Interesse-Anmeldungen und Bewerbungen (zurückziehbar), für DK-Besitzer zusätzlich eigene offene Freigaben mit Bewerberliste
 - **Benachrichtigungen** (`/benachrichtigungen`) – letzte 50 Benachrichtigungen, einzeln öffnen (markiert als gelesen) oder alle als gelesen markieren; erreichbar über die Glocke im Header mit Ungelesen-Zähler
-- **Verwaltung** (`/verwaltung`) – für Admin/Vorstand: Freischaltung wartender Mitglieder, Spielplan-Sync (Button, letzter Lauf, Stichtag bestätigter Anstoßzeiten), Links zu Spielplan- und Rollenverwaltung; die Dauerkarten-Zuordnung ist noch Platzhaltertext
+- **Verwaltung** (`/verwaltung`) – für Admin/Vorstand: Freischaltung wartender Mitglieder, Spielplan-Sync (Button, letzter Lauf, Stichtag bestätigter Anstoßzeiten), Links zu Spielplan- und Rollenverwaltung; Dauerkarten-Übersicht mit Besitzer und dessen Status, Karten lassen sich dort (mit Bestätigung) entfernen. Angelegt werden Dauerkarten weiterhin nur über die Registrierung
 - **Verwaltung → Spielplan** (`/verwaltung/spielplan`) – Spiele anlegen, bearbeiten, löschen; Erkennung ähnlicher Vereinsnamen
 - **Verwaltung → Rollen verwalten** (`/verwaltung/rollen`) – nur Admin: Rolle zuweisen, Name/E-Mail ändern, Passwort-Mail senden
 - **Login, Registrieren, Warten** (`/login`, `/registrieren`, `/warten`) – Auth-Seiten; `/warten` sehen Mitglieder mit Status `ausstehend`. Bei der Registrierung kann „Ich habe eine Dauerkarte" angehakt werden; dann wird automatisch eine Karte mit `besitzer_id = user.id` und `bezeichnung` „DK {Name}" angelegt, die der Vorstand in der Verwaltung kontrolliert
@@ -194,7 +194,7 @@ Mockups dazu liegen unter `mockups/`.
 | In-App-Benachrichtigungen (Glocke, Liste, gelesen markieren) | ✅ fertig |
 | Benachrichtigung bei Terminänderung durch den Sync | 📋 noch nicht begonnen |
 | Web-Push | 🚧 nur vorbereitet (Tabellen, auskommentierter Service-Worker-Code) |
-| Verwaltung → Dauerkarten-Zuordnung (echte Daten) | 🚧 nur Platzhalter |
+| Verwaltung → Dauerkarten anzeigen und entfernen | ✅ fertig |
 | Dark/Light-Mode-Toggle | 📋 bewusst zurückgestellt |
 
 Details zu offenen Punkten siehe unten, ausführlicher Kontext in `.github/copilot-instructions.md`.
@@ -228,6 +228,7 @@ seefuechse/
 │   │   ├── server/
 │   │   │   ├── db/             # Drizzle-Schema, DB-Client, Fehlerhilfen
 │   │   │   ├── freigaben.ts, bewerbungen.ts, interesse.ts  # Freigabe-/Bewerbungslogik
+│   │   │   ├── dauerkarten.ts  # Dauerkarten-Übersicht und Entfernen (Verwaltung)
 │   │   │   ├── benachrichtigungen.ts  # In-App-Benachrichtigungen
 │   │   │   ├── spiele.ts, vereinsnamen.ts  # Spielpflege, Vereinsnamen-Abgleich
 │   │   │   ├── spielplanSync.ts, spielplanTermine.ts  # OpenLigaDB-Sync, „vorläufig"
@@ -296,7 +297,7 @@ Größere Implementierungsschritte werden häufig als strukturierter Prompt für
 
 ## Offene Punkte
 
-- **Dauerkarten-Zuordnung in der Verwaltung** zeigt nur Platzhaltertext („Folgt im nächsten Schritt").
+- **Dauerkarten in der Verwaltung** lassen sich nur anzeigen und entfernen, nicht anlegen oder einem anderen Mitglied zuordnen (Anlegen nur über die Registrierung).
 - **Web-Push:** Tabellen `push_abos` und `benachrichtigung_einstellungen` existieren, Versand (`benachrichtigen()`) und Service-Worker-Handler sind noch nicht umgesetzt.
 - **Benachrichtigung bei Terminänderungen:** Der Sync liefert verschobene Termine (`terminAenderungen`), daraus werden noch keine Benachrichtigungen erzeugt.
 - **`manuell_ueberschrieben` zurücksetzen** geht nur per SQL, es gibt keinen Button.

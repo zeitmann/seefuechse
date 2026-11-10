@@ -1,10 +1,16 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { mitglieder, syncLaeufe } from '$lib/server/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { hatVerwaltungsRolle, hatAdminRolle } from '$lib/server/rollen';
 import { AKTUELLE_SAISON, fuehreSyncMitProtokollAus } from '$lib/server/spielplanSync';
 import { ermittleTerminierungsStichtag } from '$lib/server/spielplanTermine';
+import {
+	dauerkartenUebersicht,
+	dauerkarteEntfernen,
+	type DauerkartenEintrag
+} from '$lib/server/dauerkarten';
+import { UUID_MUSTER } from '$lib/server/spiele';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -17,7 +23,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			letzterSync: null,
 			syncSaison: AKTUELLE_SAISON,
 			istAdmin: false,
-			ausstehendeMitglieder: [] as { id: string; name: string; email: string }[]
+			ausstehendeMitglieder: [] as { id: string; name: string; email: string }[],
+			dauerkarten: [] as DauerkartenEintrag[]
 		};
 	}
 
@@ -28,7 +35,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(mitglieder)
 		.where(eq(mitglieder.status, 'ausstehend'));
 
-	const [terminierungsStichtag, [letzterSync]] = await Promise.all([
+	const [terminierungsStichtag, [letzterSync], dauerkarten] = await Promise.all([
 		ermittleTerminierungsStichtag(),
 		db
 			.select({
@@ -39,7 +46,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			})
 			.from(syncLaeufe)
 			.orderBy(desc(syncLaeufe.gestartetAm))
-			.limit(1)
+			.limit(1),
+		dauerkartenUebersicht()
 	]);
 
 	return {
@@ -48,7 +56,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		ausstehendeMitglieder,
 		terminierungsStichtag,
 		letzterSync: letzterSync ?? null,
-		syncSaison: AKTUELLE_SAISON
+		syncSaison: AKTUELLE_SAISON,
+		dauerkarten
 	};
 };
 
@@ -98,5 +107,29 @@ export const actions: Actions = {
 			.update(mitglieder)
 			.set({ status: 'abgelehnt' })
 			.where(and(eq(mitglieder.id, mitgliedId), eq(mitglieder.status, 'ausstehend')));
+	},
+
+	/**
+	 * Entfernt eine Dauerkarte samt Freigaben und Bewerbungen (ON DELETE CASCADE).
+	 * Idempotent: eine bereits entfernte Karte ist kein Fehler.
+	 */
+	dauerkarteEntfernen: async ({ request, locals }) => {
+		const { user } = await locals.safeGetSession();
+		if (!user || !(await hatVerwaltungsRolle(user.id))) {
+			error(403, 'Keine Berechtigung');
+		}
+
+		const form = await request.formData();
+		const dauerkarteId = String(form.get('dauerkarteId') ?? '').trim();
+		if (!dauerkarteId || !UUID_MUSTER.test(dauerkarteId)) {
+			return fail(400, { dauerkarteFehler: 'Ungültige Dauerkarten-ID.' });
+		}
+
+		const entfernt = await dauerkarteEntfernen(dauerkarteId);
+		return {
+			dauerkarteMeldung: entfernt
+				? 'Dauerkarte entfernt.'
+				: 'Diese Dauerkarte war bereits entfernt.'
+		};
 	}
 };

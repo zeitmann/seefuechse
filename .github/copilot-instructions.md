@@ -46,7 +46,7 @@ Keine alternativen Frameworks/Libraries vorschlagen. Next.js/React ist bewusst z
 
 Tabellen: `mitglieder` (id = FK auf `auth.users.id`), `rollen`, `mitglied_rollen`, `dauerkarten`, `spiele`, `freigaben`, `bewerbungen`, `interesse`, `benachrichtigungen`, `push_abos`, `benachrichtigung_einstellungen`, `sync_laeufe`. Das ER-Diagramm unter `DB-stucture/` zeigt nur den Planungsstand der Kerntabellen; maßgeblich ist `schema.ts`.
 
-- `dauerkarten`: `besitzer_id` und `bezeichnung` NOT NULL, `platz` optional; kein Block/Reihe (alle Karten im selben Block). Bei der Registrierung kann „Ich habe eine Dauerkarte" angehakt werden; dann legt `/registrieren` in derselben Transaktion wie das Mitglied eine Karte mit `besitzer_id = user.id` und `bezeichnung` „DK {Name}" an. Kontrolle durch den Vorstand in der Verwaltung.
+- `dauerkarten`: `besitzer_id` und `bezeichnung` NOT NULL, `platz` optional; kein Block/Reihe (alle Karten im selben Block). Bei der Registrierung kann „Ich habe eine Dauerkarte" angehakt werden; dann legt `/registrieren` in derselben Transaktion wie das Mitglied eine Karte mit `besitzer_id = user.id` und `bezeichnung` „DK {Name}" an. Kontrolle in `/verwaltung` (Admin und Vorstand): Liste aller Karten mit Besitzer und dessen Status, Action `dauerkarteEntfernen` (Freigaben und Bewerbungen werden per CASCADE mitgelöscht). Logik in `src/lib/server/dauerkarten.ts`.
 - `interesse`: Interessensbekundung eines Mitglieds für ein Spiel ohne Freigabe, UNIQUE (`mitglied_id`, `spiel_id`). In Gebrauch (`src/lib/server/interesse.ts`, `/spielplan/[id]`, `/anfragen`, Zähler auf `/karte`).
 - `benachrichtigungen`: In-App-Benachrichtigungen (Glocke), Typ-Enum `benachrichtigung_typ` (`neue_anfrage`, `anfrage_angenommen`, `anfrage_abgelehnt`, `karte_freigegeben`, `neues_interesse`), `gelesen_am` null = ungelesen. In Gebrauch (`src/lib/server/benachrichtigungen.ts`, `/benachrichtigungen`, Header).
 - `push_abos` (Web-Push-Abo je Gerät) und `benachrichtigung_einstellungen` (Push an/aus je Mitglied und Typ, fehlende Zeile = an): nur im Schema, im Code noch nicht verwendet.
@@ -124,7 +124,7 @@ Stand 10.11.2026, gegen den Code geprüft. Bereits fertig und daher **nicht** of
 
 - Web-Push: Versand in `benachrichtigen()` (TODO im Code) und `push`-/`notificationclick`-Handler in `src/service-worker.ts` (auskommentiert) fehlen; `push_abos` und `benachrichtigung_einstellungen` sind ungenutzt.
 - In-App-Benachrichtigung bei Datums- oder Uhrzeitänderung von Spielen mit Freigaben/Bewerbungen (der Sync liefert `terminAenderungen` bereits, angezeigt wird nur die Anzahl in `/verwaltung`).
-- Dauerkarten-Zuordnung in `/verwaltung` (nur Platzhaltertext).
+- Dauerkarten in `/verwaltung` anlegen oder einem anderen Mitglied zuordnen (aktuell nur anzeigen und entfernen; Anlegen nur über die Registrierung).
 - Admin-UI zum Zurücksetzen von `manuell_ueberschrieben`.
 - Mehrfach-Dauerkarten pro Besitzer: `/karte` und `/spielplan/[id]` nutzen `findFirst`, das Dashboard die erste Karte.
 - Vorverkaufstermine (Heim/Auswärts) und Spielergebnisse: keine Spalten im Schema.

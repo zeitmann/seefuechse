@@ -1,11 +1,26 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import Card from '$lib/components/Card.svelte';
+	import FehlerHinweis from '$lib/components/FehlerHinweis.svelte';
 	import Header from '$lib/components/Header.svelte';
+	import { mitNeuladenBeiFehler } from '$lib/enhance';
 	import SpielplanSyncKarte from './SpielplanSyncKarte.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	// Inline-Bestätigung statt window.confirm (zuverlässig auch in der iPhone-PWA):
+	// ID der Dauerkarte, deren Entfernen gerade bestätigt werden soll.
+	let entfernenBestaetigenId = $state<string | null>(null);
+
+	const entfernenAbsenden: SubmitFunction = async (eingabe) => {
+		const nachher = await mitNeuladenBeiFehler(eingabe);
+		return async (ergebnis) => {
+			if (nachher) await nachher(ergebnis);
+			entfernenBestaetigenId = null;
+		};
+	};
 </script>
 
 <div class="page-container">
@@ -74,12 +89,79 @@
 				{/if}
 			</section>
 
-			<!-- Dauerkarten-Zuordnung (folgt im nächsten Schritt) -->
+			<!-- Dauerkarten: Kontrolle der bei der Registrierung angegebenen Karten -->
 			<section class="section">
 				<div class="section-header">
-					<h2>Dauerkarten-Zuordnung</h2>
+					<h2>Dauerkarten</h2>
+					{#if data.dauerkarten.length > 0}
+						<span class="badge badge-neutral">{data.dauerkarten.length}</span>
+					{/if}
 				</div>
-				<p class="placeholder-text">Folgt im nächsten Schritt.</p>
+
+				<FehlerHinweis nachricht={form?.dauerkarteFehler} />
+				{#if form?.dauerkarteMeldung}
+					<p class="meldung" role="status">{form.dauerkarteMeldung}</p>
+				{/if}
+
+				{#if data.dauerkarten.length === 0}
+					<p class="empty-state">Noch keine Dauerkarten.</p>
+				{:else}
+					<Card>
+						<ul class="member-list">
+							{#each data.dauerkarten as karte (karte.id)}
+								<li class="member-item dk-item">
+									<div class="member-info">
+										<span class="member-name">{karte.bezeichnung}</span>
+										<span class="dk-details">
+											<span class="dk-besitzer">{karte.besitzer.name}</span>
+											{#if karte.platz}
+												<span>· Platz {karte.platz}</span>
+											{/if}
+										</span>
+										<span class="status-badge status-{karte.besitzer.status}">
+											{karte.besitzer.status}
+										</span>
+									</div>
+
+									{#if entfernenBestaetigenId === karte.id}
+										<form
+											method="POST"
+											action="?/dauerkarteEntfernen"
+											class="bestaetigung"
+											use:enhance={entfernenAbsenden}
+										>
+											<input type="hidden" name="dauerkarteId" value={karte.id} />
+											<p class="bestaetigung-text">
+												Wirklich entfernen? Löscht auch alle Freigaben und Anfragen zu dieser
+												Karte.
+											</p>
+											<div class="member-actions">
+												<button type="submit" class="btn-gefahr">Ja, entfernen</button>
+												<button
+													type="button"
+													class="btn-ablehnen"
+													onclick={() => (entfernenBestaetigenId = null)}
+												>
+													Abbrechen
+												</button>
+											</div>
+										</form>
+									{:else}
+										<div class="member-actions">
+											<button
+												type="button"
+												class="btn-ablehnen"
+												onclick={() => (entfernenBestaetigenId = karte.id)}
+											>
+												Entfernen
+											</button>
+										</div>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					</Card>
+				{/if}
 			</section>
 
 			<section class="section">
@@ -257,10 +339,99 @@
 		color: var(--color-text);
 	}
 
-	.placeholder-text {
-		margin: 0;
-		font-size: 14px;
+	.badge-neutral {
+		background: var(--color-surface-raised);
 		color: var(--color-text-muted);
+	}
+
+	.meldung {
+		margin: 0 0 12px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--color-success);
+	}
+
+	/* Dauerkarten: Bestätigung bricht auf schmalen Displays in eine eigene Zeile um */
+	.dk-item {
+		flex-wrap: wrap;
+	}
+
+	.dk-item .member-info {
+		flex: 1;
+	}
+
+	.dk-details {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		font-size: 13px;
+		color: var(--color-text-muted);
+	}
+
+	.dk-besitzer {
+		color: var(--color-text);
+	}
+
+	.status-badge {
+		align-self: flex-start;
+		margin-top: 4px;
+		padding: 2px 8px;
+		border-radius: var(--radius-full);
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.status-aktiv {
+		background: var(--color-success-muted);
+		color: var(--color-success);
+	}
+
+	.status-ausstehend {
+		background: var(--color-warning-muted);
+		color: var(--color-warning);
+	}
+
+	.status-abgelehnt {
+		background: var(--color-accent-muted);
+		color: var(--color-accent);
+	}
+
+	.bestaetigung {
+		flex-basis: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin: 0;
+	}
+
+	.bestaetigung-text {
+		margin: 0;
+		font-size: 13px;
+		color: var(--color-text);
+		line-height: 1.4;
+	}
+
+	.btn-gefahr {
+		padding: 6px 14px;
+		border-radius: var(--radius-md);
+		border: none;
+		background: var(--color-accent);
+		color: #fff;
+		font-size: 13px;
+		font-weight: 600;
+		cursor: pointer;
+		font-family: inherit;
+		transition: opacity 0.15s;
+	}
+
+	.btn-gefahr:hover {
+		opacity: 0.85;
+	}
+
+	.dk-item .member-actions button {
+		min-height: 36px;
 	}
 
 	.verwaltungs-link {
