@@ -42,9 +42,12 @@
 	<div class="match-card">
 		<div class="date-section">
 			{#if rundeBlock}
-				<div class="date-day" class:runde-text={rundeBlock.klein === null}>{rundeBlock.gross}</div>
 				{#if rundeBlock.klein}
-					<div class="date-month">{rundeBlock.klein}</div>
+					<div class="date-day">{rundeBlock.gross}</div>
+					<div class="runde-label">{rundeBlock.klein}</div>
+				{:else}
+					<!-- Voller Name als title, falls er abgeschnitten wird -->
+					<div class="runde-text" title={rundeBlock.gross}>{rundeBlock.gross}</div>
 				{/if}
 			{:else}
 				<div class="date-day">{datumBlock.tag}</div>
@@ -95,7 +98,7 @@
 	.date-section {
 		flex-shrink: 0;
 		/* Feste Breite, damit Spieltag, Runde und Datum in der Liste fluchten */
-		width: 56px;
+		width: 64px;
 		text-align: center;
 		font-family: var(--font-mono);
 	}
@@ -107,21 +110,38 @@
 		color: var(--color-text);
 	}
 
-	/* Runde ohne Nummer ('Achtelfinale'): kleiner und umbrechbar */
-	.date-day.runde-text {
-		font-family: var(--font-sans);
-		font-size: 12px;
-		font-weight: 700;
-		line-height: 1.2;
-		hyphens: auto;
-		overflow-wrap: anywhere;
-	}
-
 	.date-month {
 		font-size: 12px;
 		color: var(--color-text-muted);
 		margin-top: 4px;
-		overflow-wrap: anywhere;
+	}
+
+	/* 'Spieltag'/'Runde' unter der Nummer: einzeilig, ohne Trennung */
+	.runde-label {
+		margin-top: 4px;
+		font-size: 10px;
+		letter-spacing: 0.2px;
+		color: var(--color-text-muted);
+		white-space: nowrap;
+		hyphens: none;
+	}
+
+	/*
+	 * Runde ohne Nummer ('Achtelfinale'): einzeilig, ohne Trennung. Was nicht in
+	 * 64px passt (z. B. 'Viertelfinale'), endet mit '…'; voller Name im title und
+	 * weiterhin vollständig im DOM (Screenreader lesen ihn ganz).
+	 */
+	.runde-text {
+		font-family: var(--font-sans);
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: -0.1px;
+		line-height: 1.2;
+		color: var(--color-text);
+		white-space: nowrap;
+		hyphens: none;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.content-section {

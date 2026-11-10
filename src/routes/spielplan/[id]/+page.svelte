@@ -45,11 +45,11 @@
 			<div class="spiel-hero">
 				<div class="hero-date">
 					{#if rundeBlock}
-						<span class="hero-day" class:runde-text={rundeBlock.klein === null}>
-							{rundeBlock.gross}
-						</span>
 						{#if rundeBlock.klein}
-							<span class="hero-month">{rundeBlock.klein}</span>
+							<span class="hero-day">{rundeBlock.gross}</span>
+							<span class="hero-month runde-label">{rundeBlock.klein}</span>
+						{:else}
+							<span class="runde-text" title={rundeBlock.gross}>{rundeBlock.gross}</span>
 						{/if}
 					{:else}
 						<span class="hero-day">{datumBlock.tag}</span>
@@ -293,15 +293,27 @@
 		color: var(--color-text);
 	}
 
-	/* Runde ohne Nummer ('Achtelfinale'): kleiner und umbrechbar */
-	.hero-day.runde-text {
-		max-width: 72px;
+	/* 'Spieltag'/'Runde' unter der Nummer: einzeilig, ohne Trennung */
+	.hero-month.runde-label {
+		white-space: nowrap;
+		hyphens: none;
+	}
+
+	/*
+	 * Runde ohne Nummer ('Achtelfinale'): einzeilig, ohne Trennung. Der Hero ist
+	 * keine Liste, der Block darf dafür breiter werden; erst ab 112px '…'.
+	 */
+	.runde-text {
+		max-width: 112px;
 		font-family: var(--font-sans);
 		font-size: 13px;
+		font-weight: 700;
 		line-height: 1.2;
 		text-align: center;
-		hyphens: auto;
-		overflow-wrap: anywhere;
+		white-space: nowrap;
+		hyphens: none;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.hero-month {
