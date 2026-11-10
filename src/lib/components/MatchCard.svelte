@@ -58,7 +58,7 @@
 		<div class="content-section">
 			<div class="badges-row">
 				<span class="badge badge-heim">{heimAuswaertsText}</span>
-				<span class="badge badge-wettbewerb">{wettbewerb.toUpperCase()}</span>
+				<span class="badge badge-wettbewerb" title={wettbewerb}>{wettbewerb.toUpperCase()}</span>
 			</div>
 			<h3 class="gegner">{gegner}</h3>
 			{#if rundeBlock || uhrzeit}
@@ -98,7 +98,7 @@
 	.date-section {
 		flex-shrink: 0;
 		/* Feste Breite, damit Spieltag, Runde und Datum in der Liste fluchten */
-		width: 64px;
+		width: 76px;
 		text-align: center;
 		font-family: var(--font-mono);
 	}
@@ -127,15 +127,15 @@
 	}
 
 	/*
-	 * Runde ohne Nummer ('Achtelfinale'): einzeilig, ohne Trennung. Was nicht in
-	 * 64px passt (z. B. 'Viertelfinale'), endet mit '…'; voller Name im title und
-	 * weiterhin vollständig im DOM (Screenreader lesen ihn ganz).
+	 * Runde ohne Nummer ('Achtelfinale'): einzeilig, ohne Trennung. 10px passt für
+	 * Achtel-/Viertelfinale in 76px (ca. 69–75px); Längeres ('Zwischenrunde') endet
+	 * mit '…', voller Name im title und vollständig im DOM (Screenreader).
 	 */
 	.runde-text {
 		font-family: var(--font-sans);
 		font-size: 10px;
 		font-weight: 700;
-		letter-spacing: -0.1px;
+		letter-spacing: -0.2px;
 		line-height: 1.2;
 		color: var(--color-text);
 		white-space: nowrap;
@@ -163,8 +163,13 @@
 		font-size: 11px;
 		font-weight: 600;
 		letter-spacing: 0.5px;
-		/* Lange Wettbewerbe ('CONFERENCE LEAGUE') nicht im Badge umbrechen */
+		/* Lange Wettbewerbe ('CONFERENCE LEAGUE') nicht im Badge umbrechen, sondern
+		   bei 375px mit '…' kürzen statt über das Ergebnis rechts zu ragen */
 		white-space: nowrap;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		vertical-align: top;
 	}
 
 	.badge-heim {
@@ -185,6 +190,9 @@
 		margin: 0;
 		color: var(--color-text);
 		margin-bottom: 8px;
+		/* Lange Einzelwörter ('Mönchengladbach') umbrechen statt überzulaufen */
+		overflow-wrap: anywhere;
+		hyphens: auto;
 	}
 
 	.time-row {
