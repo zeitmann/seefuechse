@@ -174,6 +174,7 @@ Mockups dazu liegen unter `mockups/`.
 - **Verwaltung → Spielplan** (`/verwaltung/spielplan`) – Spiele anlegen, bearbeiten, löschen; Erkennung ähnlicher Vereinsnamen
 - **Verwaltung → Rollen verwalten** (`/verwaltung/rollen`) – nur Admin: Rolle zuweisen, Name/E-Mail ändern, Passwort-Mail senden
 - **Login, Registrieren, Passwort ändern, Warten** (`/login`, `/registrieren`, `/passwort-aendern`, `/warten`) – Auth-Seiten; `/warten` sehen Mitglieder mit Status `ausstehend`
+- **Passwort vergessen** (`/passwort-vergessen` → Mail → `/auth/callback?next=/passwort-neu` → `/passwort-neu`) – Reset-Link anfordern (neutrale Antwort), Callback tauscht `code` bzw. `token_hash` gegen eine Session, danach neues Passwort setzen
 - **Cron-Endpoint** (`POST /api/cron/spielplan-sync`) – kein Seitenaufruf, wird von der Netlify Scheduled Function per Token aufgerufen
 
 ## Implementierungsstand
@@ -214,6 +215,8 @@ seefuechse/
 │   ├── routes/
 │   │   ├── +page.svelte        # Start-Dashboard
 │   │   ├── login/, registrieren/, logout/, warten/, passwort-aendern/
+│   │   ├── passwort-vergessen/, passwort-neu/
+│   │   ├── auth/callback/      # Einstieg aus Auth-Mails (code / token_hash)
 │   │   ├── spielplan/          # Liste
 │   │   │   └── [id]/           # Spieldetail
 │   │   ├── karte/              # Meine Dauerkarte (nur DK-Besitzer)

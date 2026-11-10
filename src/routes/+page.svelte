@@ -3,8 +3,12 @@
 	import Card from '$lib/components/Card.svelte';
 	import MatchCard from '$lib/components/MatchCard.svelte';
 	import { formatiereUhrzeit } from '$lib/zeit';
+	import { page } from '$app/state';
 
 	let { data } = $props();
+
+	// Gesetzt von /passwort-neu nach erfolgreichem Speichern.
+	const passwortGeaendert = $derived(page.url.searchParams.get('passwort') === 'geaendert');
 
 	function getInitials(name) {
 		return name
@@ -22,6 +26,10 @@
 	<Header />
 
 	<main class="main-content">
+		{#if passwortGeaendert}
+			<p class="erfolg-meldung" role="status">Dein neues Passwort wurde gespeichert.</p>
+		{/if}
+
 		<!-- Begrüßung mit Avatar -->
 		<section class="greeting-section">
 			<div class="greeting-header">
@@ -137,6 +145,16 @@
 		padding: 20px 16px 100px;
 		max-width: var(--container-max);
 		margin: 0 auto;
+	}
+
+	.erfolg-meldung {
+		margin: 0;
+		background: var(--color-success-muted);
+		border: 1px solid var(--color-success);
+		border-radius: var(--radius-md);
+		color: var(--color-success);
+		font-size: 14px;
+		padding: 10px 14px;
 	}
 
 	/* GREETING */

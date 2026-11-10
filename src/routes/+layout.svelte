@@ -5,7 +5,7 @@
 
 	let { children, data } = $props();
 
-	const AUTH_ROUTES = ['/login', '/registrieren', '/warten'];
+	const AUTH_ROUTES = ['/login', '/registrieren', '/warten', '/passwort-vergessen', '/passwort-neu'];
 	const showNav = $derived(
 		data.mitgliedStatus === 'aktiv' && !AUTH_ROUTES.includes(page.url.pathname)
 	);

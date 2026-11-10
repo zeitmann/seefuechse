@@ -5,7 +5,16 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 // '/passwort-aendern' ist testweise öffentlich: Der Reset-Link aus der
 // Supabase-Mail wird ohne reguläre Session aufgerufen – die Recovery-Session
 // entsteht erst clientseitig aus dem URL-Fragment.
-const PUBLIC_ROUTES = ['/login', '/registrieren', '/passwort-aendern'];
+const PUBLIC_ROUTES = [
+	'/login',
+	'/registrieren',
+	'/passwort-aendern',
+	'/passwort-vergessen',
+	'/auth/callback'
+];
+// Login nötig, aber unabhängig vom Mitgliedsstatus erreichbar (auch 'ausstehend'
+// soll ein vergessenes Passwort neu setzen können).
+const OHNE_STATUSPRUEFUNG = ['/passwort-neu'];
 const WARTE_ROUTE = '/warten';
 // Cron-Endpoint: ohne Login erreichbar, schützt sich selbst per Bearer-Token (CRON_SECRET).
 const CRON_ROUTE = '/api/cron/spielplan-sync';
@@ -43,7 +52,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			redirect(303, '/login');
 		}
 	} else {
-		if (!ohneLogin && path !== WARTE_ROUTE) {
+		if (!ohneLogin && path !== WARTE_ROUTE && !OHNE_STATUSPRUEFUNG.includes(path)) {
 			const { db } = await import('$lib/server/db');
 			const { mitglieder } = await import('$lib/server/db/schema');
 			const { eq } = await import('drizzle-orm');

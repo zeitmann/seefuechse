@@ -152,7 +152,7 @@ export const actions: Actions = {
 			return fail(404, { mailFehler: true, mitgliedId, message: 'Mitglied nicht gefunden' });
 
 		const { error: resetFehler } = await locals.supabase.auth.resetPasswordForEmail(mitglied.email, {
-			redirectTo: `${url.origin}/passwort-aendern`
+			redirectTo: `${url.origin}/auth/callback?next=/passwort-neu`
 		});
 		if (resetFehler)
 			return fail(400, {

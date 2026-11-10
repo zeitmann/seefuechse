@@ -60,6 +60,10 @@
 		</form>
 
 		<p class="link-hint">
+			<a href="/passwort-vergessen">Passwort vergessen?</a>
+		</p>
+
+		<p class="link-hint">
 			Noch kein Konto? <a href="/registrieren">Registrieren</a>
 		</p>
 	</Card>
