@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { mitglieder } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { hatVerwaltungsRolle, hatAdminRolle } from '$lib/server/rollen';
+import { synchronisiereSpielplan } from '$lib/server/spielplanSync';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -26,7 +27,24 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return { kannVerwalten: true, istAdmin, ausstehendeMitglieder };
 };
 
+/** Saison des OpenLigaDB-Syncs (2026 = Saison 2026/27). */
+const SYNC_SAISON = 2026;
+
 export const actions: Actions = {
+	/**
+	 * Übernimmt den Spielplan aus OpenLigaDB. Rollenprüfung hier erneut, da
+	 * Actions unabhängig vom load() direkt per POST erreichbar sind.
+	 */
+	synchronisieren: async ({ locals }) => {
+		const { user } = await locals.safeGetSession();
+		if (!user || !(await hatVerwaltungsRolle(user.id))) {
+			error(403, 'Keine Berechtigung');
+		}
+
+		const sync = await synchronisiereSpielplan(SYNC_SAISON);
+		return { sync };
+	},
+
 	freischalten: async ({ request, locals }) => {
 		const { user } = await locals.safeGetSession();
 		if (!user || !(await hatVerwaltungsRolle(user.id))) {

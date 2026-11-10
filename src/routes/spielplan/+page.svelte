@@ -20,11 +20,12 @@
 		['test', 'Testspiele']
 	];
 
-	const wettbewerbMap: Record<Exclude<Filter, 'alle'>, string> = {
-		liga: 'Bundesliga',
-		pokal: 'DFB-Pokal',
-		europa: 'Europa League',
-		test: 'Testspiel'
+	// Ein Filter kann mehrere Wettbewerbe umfassen ('Europa' = EL und Conference League).
+	const wettbewerbMap: Record<Exclude<Filter, 'alle'>, string[]> = {
+		liga: ['Bundesliga'],
+		pokal: ['DFB-Pokal'],
+		europa: ['Europa League', 'Conference League'],
+		test: ['Testspiel']
 	};
 
 	const gefilterteSpiele = $derived.by(() => {
@@ -36,7 +37,8 @@
 				: [...data.spiele].filter((s) => s.datum < heute).reverse();
 
 		if (aktiveFilter === 'alle') return nachTab;
-		return nachTab.filter((s) => s.wettbewerb === wettbewerbMap[aktiveFilter]);
+		const erlaubt = wettbewerbMap[aktiveFilter];
+		return nachTab.filter((s) => erlaubt.includes(s.wettbewerb));
 	});
 </script>
 

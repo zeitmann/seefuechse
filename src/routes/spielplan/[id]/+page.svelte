@@ -290,6 +290,7 @@
 
 	.hero-badges {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 8px;
 		margin-bottom: 10px;
 	}
@@ -301,6 +302,7 @@
 		font-size: 11px;
 		font-weight: 700;
 		letter-spacing: 0.5px;
+		white-space: nowrap;
 	}
 
 	.badge-heim {

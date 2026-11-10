@@ -144,6 +144,7 @@
 
 	.spiel-badges {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 6px;
 		margin-bottom: 6px;
 	}
@@ -155,6 +156,7 @@
 		font-size: 10px;
 		font-weight: 700;
 		letter-spacing: 0.5px;
+		white-space: nowrap;
 	}
 
 	.badge-wettbewerb {

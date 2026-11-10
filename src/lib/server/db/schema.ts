@@ -104,7 +104,11 @@ export const spiele = pgTable('spiele', {
 	wettbewerb: text('wettbewerb').notNull(),
 	heimAuswaerts: heimAuswaertsEnum('heim_auswaerts').notNull(),
 	// Europa-League-Spiele haben keine OpenLigaDB-ID -> nullable
-	openligadbId: text('openligadb_id')
+	openligadbId: text('openligadb_id'),
+	// true = von Hand gepflegt, der OpenLigaDB-Sync überschreibt das Spiel nicht
+	manuellUeberschrieben: boolean('manuell_ueberschrieben').notNull().default(false),
+	// lastUpdateDateTime aus OpenLigaDB beim letzten übernommenen Stand
+	openligadbAktualisiertAm: timestamp('openligadb_aktualisiert_am', { withTimezone: true })
 });
 
 export const freigaben = pgTable('freigaben', {

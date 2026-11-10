@@ -2,9 +2,10 @@
 	import { enhance } from '$app/forms';
 	import Card from '$lib/components/Card.svelte';
 	import Header from '$lib/components/Header.svelte';
-	import type { PageData } from './$types';
+	import SpielplanSyncKarte from './SpielplanSyncKarte.svelte';
+	import type { PageData, ActionData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
 
 <div class="page-container">
@@ -23,6 +24,8 @@
 				</div>
 			</Card>
 		{:else}
+			<SpielplanSyncKarte ergebnis={form?.sync ?? null} />
+
 			<!-- Ausstehende Freischaltungen (nur für Admin/Vorstand) -->
 			<section class="section">
 				<div class="section-header">

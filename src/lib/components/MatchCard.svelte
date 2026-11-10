@@ -88,6 +88,7 @@
 
 	.badges-row {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 8px;
 		margin-bottom: 8px;
 	}
@@ -99,6 +100,8 @@
 		font-size: 11px;
 		font-weight: 600;
 		letter-spacing: 0.5px;
+		/* Lange Wettbewerbe ('CONFERENCE LEAGUE') nicht im Badge umbrechen */
+		white-space: nowrap;
 	}
 
 	.badge-heim {
