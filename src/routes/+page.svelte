@@ -40,7 +40,8 @@
 					<h2>Servus, {data.mitgliedName}</h2>
 					{#if data.isCardOwner && data.meineDauerkarte}
 						<p class="card-info">
-							📇 {data.meineDauerkarte.bezeichnung} • {data.meineDauerkarte.block}, {data.meineDauerkarte.reihe}
+							📇 {data.meineDauerkarte.bezeichnung}{#if data.meineDauerkarte.platz}
+								• Platz {data.meineDauerkarte.platz}{/if}
 						</p>
 					{/if}
 				</div>

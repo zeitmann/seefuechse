@@ -28,7 +28,9 @@
 				<div class="dauerkarte-info">
 					<div class="dauerkarte-details">
 						<p class="dauerkarte-name">{data.dauerkarte.bezeichnung}</p>
-						<p class="dauerkarte-ort">{data.dauerkarte.block} · {data.dauerkarte.reihe} · Platz {data.dauerkarte.platz}</p>
+						{#if data.dauerkarte.platz}
+							<p class="dauerkarte-ort">Platz {data.dauerkarte.platz}</p>
+						{/if}
 					</div>
 					{#if data.freigegebenCount > 0}
 						<span class="freigegeben-badge">{data.freigegebenCount} FREIGEGEBEN</span>

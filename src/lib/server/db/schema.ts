@@ -91,9 +91,9 @@ export const dauerkarten = pgTable('dauerkarten', {
 	// Unterscheidet mehrere Karten desselben Besitzers, z. B. persönliche
 	// Dauerkarte vs. Fanclubkarte beim Präsidenten ("DK 1", "Fanclubkarte 1" ...).
 	bezeichnung: text('bezeichnung').notNull(),
-	block: text('block').notNull(),
-	reihe: text('reihe').notNull(),
-	platz: text('platz').notNull()
+	// Alle Karten liegen im selben Block, daher keine Block-/Reihe-Spalten.
+	// Platz ist optional (null = nicht erfasst).
+	platz: text('platz')
 });
 
 /**

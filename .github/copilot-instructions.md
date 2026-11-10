@@ -46,6 +46,7 @@ Keine alternativen Frameworks/Libraries vorschlagen. Next.js/React ist bewusst z
 
 Tabellen: `mitglieder` (id = FK auf `auth.users.id`), `rollen`, `mitglied_rollen`, `dauerkarten`, `spiele`, `freigaben`, `bewerbungen`, `interesse`, `benachrichtigungen`, `push_abos`, `benachrichtigung_einstellungen`, `sync_laeufe`. Das ER-Diagramm unter `DB-stucture/` zeigt nur den Planungsstand der Kerntabellen; maßgeblich ist `schema.ts`.
 
+- `dauerkarten`: `besitzer_id` und `bezeichnung` NOT NULL, `platz` optional; kein Block/Reihe (alle Karten im selben Block).
 - `interesse`: Interessensbekundung eines Mitglieds für ein Spiel ohne Freigabe, UNIQUE (`mitglied_id`, `spiel_id`). In Gebrauch (`src/lib/server/interesse.ts`, `/spielplan/[id]`, `/anfragen`, Zähler auf `/karte`).
 - `benachrichtigungen`: In-App-Benachrichtigungen (Glocke), Typ-Enum `benachrichtigung_typ` (`neue_anfrage`, `anfrage_angenommen`, `anfrage_abgelehnt`, `karte_freigegeben`, `neues_interesse`), `gelesen_am` null = ungelesen. In Gebrauch (`src/lib/server/benachrichtigungen.ts`, `/benachrichtigungen`, Header).
 - `push_abos` (Web-Push-Abo je Gerät) und `benachrichtigung_einstellungen` (Push an/aus je Mitglied und Typ, fehlende Zeile = an): nur im Schema, im Code noch nicht verwendet.

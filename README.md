@@ -79,9 +79,7 @@ erDiagram
     uuid id PK
     uuid besitzer_id FK
     string bezeichnung
-    string block
-    string reihe
-    string platz
+    string platz "optional"
   }
   SPIELE {
     uuid id PK
@@ -138,7 +136,7 @@ Alle Tabellen in Kürze:
 - **mitglieder** – Stammdaten der Mitglieder (per FK an `auth.users`); `status` steuert den Freischaltungs-Flow
 - **rollen** – verfügbare Rollen (Admin, Vorstand, Mitglied)
 - **mitglied_rollen** – Verknüpfungstabelle Mitglied ↔ Rolle (many-to-many)
-- **dauerkarten** – die 12 Dauerkarten + 2 Fanclubkarten, jeweils einem Besitzer zugeordnet; `bezeichnung` unterscheidet mehrere Karten (z. B. „DK 1", „Fanclubkarte 1")
+- **dauerkarten** – die 12 Dauerkarten + 2 Fanclubkarten, jeweils einem Besitzer zugeordnet; `bezeichnung` unterscheidet mehrere Karten (z. B. „DK 1", „Fanclubkarte 1"); alle Karten liegen im selben Block, daher kein Block/Reihe, `platz` ist optional
 - **spiele** – Spielplan mit Datum und Anstoßzeit (`uhrzeit`, null = unbekannt); `openligadb_id` verknüpft das Spiel mit OpenLigaDB, `manuell_ueberschrieben` schützt Handkorrekturen vor dem Sync
 - **freigaben** – verknüpft eine Dauerkarte mit einem Spiel, sobald sie freigegeben wird
 - **bewerbungen** – Bewerbungen von Mitgliedern auf eine Freigabe (eine pro Mitglied und Freigabe)
