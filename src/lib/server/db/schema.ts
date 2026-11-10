@@ -110,7 +110,9 @@ export const spiele = pgTable('spiele', {
 	gegner: text('gegner').notNull(),
 	wettbewerb: text('wettbewerb').notNull(),
 	heimAuswaerts: heimAuswaertsEnum('heim_auswaerts').notNull(),
-	// Europa-League-Spiele haben keine OpenLigaDB-ID -> nullable
+	// matchID aus OpenLigaDB; null bei von Hand angelegten Spielen (z. B. Testspiele
+	// oder Europa League – Freiburg spielt 2026/27 Conference League, die Europa
+	// League wird nicht synchronisiert)
 	openligadbId: text('openligadb_id'),
 	// true = von Hand gepflegt, der OpenLigaDB-Sync überschreibt das Spiel nicht
 	manuellUeberschrieben: boolean('manuell_ueberschrieben').notNull().default(false),

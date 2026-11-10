@@ -1,7 +1,8 @@
 // src/lib/server/spielplanSync.ts
 //
 // Übernimmt den Spielplan des SC Freiburg aus OpenLigaDB in die Tabelle `spiele`.
-// Phase 1: manuell per Button in /verwaltung ausgelöst (kein Cron).
+// Ausgelöst täglich per Netlify Scheduled Function (über /api/cron/spielplan-sync)
+// und manuell per Button in /verwaltung; jeder Lauf wird in sync_laeufe protokolliert.
 
 import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
@@ -24,7 +25,11 @@ const PROTOKOLL_AUFBEWAHRUNG_TAGE = 90;
 /** Teamname des SC Freiburg in OpenLigaDB (in allen Wettbewerben identisch). */
 const EIGENES_TEAM = 'SC Freiburg';
 
-/** Zeitlimit je Abruf – Netlify-Functions haben insgesamt nur ca. 10 s. */
+/**
+ * Zeitlimit je Liga-Abruf: 8 s. Die Abrufe laufen parallel. Die Scheduled
+ * Function, die den Cron-Endpoint aufruft, darf max. 30 s laufen und wartet
+ * selbst höchstens 25 s auf die Antwort.
+ */
 const ABRUF_TIMEOUT_MS = 8000;
 
 /**
