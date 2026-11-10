@@ -2,7 +2,7 @@
 
 > Verbindlicher Entwicklungskontext für GitHub Copilot und neue Mitwirkende. Das README bleibt der kompakte Überblick für Menschen; hier stehen Architekturentscheidungen, Konventionen, Workarounds und der technische Stand.
 > Stand: 10.11.2026.
-> Hinweis: Abschnitte 4 und 6 wurden am 10.11.2026 gegen den Code geprüft. Bei Abweichungen im Code gilt der Code, und diese Datei wird angepasst.
+> Hinweis: Abschnitte 4, 6 und 11 wurden am 10.11.2026 gegen den Code geprüft. Bei Abweichungen im Code gilt der Code, und diese Datei wird angepasst.
 
 ## 1. Projekt
 
@@ -44,7 +44,11 @@ Keine alternativen Frameworks/Libraries vorschlagen. Next.js/React ist bewusst z
 
 ## 4. Datenmodell (Kurzfassung)
 
-Tabellen: `mitglieder` (id = FK auf `auth.users.id`), `rollen`, `mitglied_rollen`, `dauerkarten`, `spiele`, `freigaben`, `bewerbungen`, `interesse`, `benachrichtigungen`, `push_abos`, `benachrichtigung_einstellungen`, `sync_laeufe`. Das ER-Diagramm liegt unter `DB-stucture/`.
+Tabellen: `mitglieder` (id = FK auf `auth.users.id`), `rollen`, `mitglied_rollen`, `dauerkarten`, `spiele`, `freigaben`, `bewerbungen`, `interesse`, `benachrichtigungen`, `push_abos`, `benachrichtigung_einstellungen`, `sync_laeufe`. Das ER-Diagramm unter `DB-stucture/` zeigt nur den Planungsstand der Kerntabellen; maßgeblich ist `schema.ts`.
+
+- `interesse`: Interessensbekundung eines Mitglieds für ein Spiel ohne Freigabe, UNIQUE (`mitglied_id`, `spiel_id`). In Gebrauch (`src/lib/server/interesse.ts`, `/spielplan/[id]`, `/anfragen`, Zähler auf `/karte`).
+- `benachrichtigungen`: In-App-Benachrichtigungen (Glocke), Typ-Enum `benachrichtigung_typ` (`neue_anfrage`, `anfrage_angenommen`, `anfrage_abgelehnt`, `karte_freigegeben`, `neues_interesse`), `gelesen_am` null = ungelesen. In Gebrauch (`src/lib/server/benachrichtigungen.ts`, `/benachrichtigungen`, Header).
+- `push_abos` (Web-Push-Abo je Gerät) und `benachrichtigung_einstellungen` (Push an/aus je Mitglied und Typ, fehlende Zeile = an): nur im Schema, im Code noch nicht verwendet.
 
 `spiele`: `id`, `datum` (date), `uhrzeit` (time without time zone, deutsche Ortszeit, nullable = noch unbekannt), `gegner`, `wettbewerb` (text), `heim_auswaerts` (Enum), `openligadb_id` (text, nullable, UNIQUE nur in der DB, siehe unten), `manuell_ueberschrieben` (boolean, Default false), `openligadb_aktualisiert_am` (timestamptz).
 
@@ -115,11 +119,14 @@ Code: `src/lib/server/spielplanSync.ts` (`synchronisiereSpielplan(saison)`, `fue
 
 ## 11. Offene Punkte
 
-- In-App-Benachrichtigung bei Datums- oder Uhrzeitänderung von Spielen mit Freigaben/Bewerbungen (der Sync liefert die Änderungen bereits).
-- Vorverkaufstermine (Heim/Auswärts) automatisch eintragen, Spielergebnisse automatisch bzw. manuell durch Admin/Vorstand.
-- Spielplan-UI: Filter-Chip „Testspiele" (ohne Spiele), Badge-Farben (Auswärts neutral, Wettbewerbe farblich unterscheiden).
+Stand 10.11.2026, gegen den Code geprüft. Bereits fertig und daher **nicht** offen: Anfragen-Seite, Rollen-Verwaltungs-UI, NavBar mit „Anfragen" für alle, Interesse-Funktion, In-App-Benachrichtigungen (Anlegen beim Auslösen, Glocke mit Zähler, Liste, gelesen markieren; Zähler wird beim Seitenladen ermittelt, kein Realtime).
+
+- Web-Push: Versand in `benachrichtigen()` (TODO im Code) und `push`-/`notificationclick`-Handler in `src/service-worker.ts` (auskommentiert) fehlen; `push_abos` und `benachrichtigung_einstellungen` sind ungenutzt.
+- In-App-Benachrichtigung bei Datums- oder Uhrzeitänderung von Spielen mit Freigaben/Bewerbungen (der Sync liefert `terminAenderungen` bereits, angezeigt wird nur die Anzahl in `/verwaltung`).
+- Dauerkarten-Zuordnung in `/verwaltung` (nur Platzhaltertext).
 - Admin-UI zum Zurücksetzen von `manuell_ueberschrieben`.
-- Rollen-Verwaltungs-UI, Dauerkarten-Zuordnung (echte Daten), Anfragen-Seite und NavBar-Variante für Mitglieder ohne Dauerkarte (noch Platzhalter bzw. offen).
-- Mehrfach-Dauerkarten pro Besitzer werden nur teilweise unterstützt (es wird die erste gefundene Karte berücksichtigt).
-- Technische Umsetzung der In-App-Benachrichtigungen (Realtime vs. Polling), Leaflet-Einsatz, Teststrategie.
+- Mehrfach-Dauerkarten pro Besitzer: `/karte` und `/spielplan/[id]` nutzen `findFirst`, das Dashboard die erste Karte.
+- Vorverkaufstermine (Heim/Auswärts) und Spielergebnisse: keine Spalten im Schema.
+- Spielplan-UI: Badge-Farben (Auswärts neutral, Wettbewerbe farblich unterscheiden); der Filter-Chip „Testspiele" existiert.
+- Leaflet ist installiert, aber nirgends eingebunden; Teststrategie offen, keine automatisierten Tests.
 - Saisonwechsel 2027/28: `AKTUELLE_SAISON` und Liga-Kürzel anpassen.

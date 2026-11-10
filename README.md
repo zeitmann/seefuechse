@@ -16,6 +16,7 @@
 - [Projektstruktur](#projektstruktur)
 - [Spielplan-Synchronisation](#spielplan-synchronisation)
 - [Setup / Lokale Entwicklung](#setup--lokale-entwicklung)
+- [Deployment](#deployment)
 - [Git-Konventionen](#git-konventionen)
 - [Offene Punkte](#offene-punkte)
 
@@ -25,26 +26,27 @@ Die Seefüchse sind ein Fanclub des SC Freiburg mit Sitz am Bodensee und rund 28
 
 ## Kernfunktion
 
-Kann ein Dauerkarten-Besitzer ein Spiel nicht besuchen, gibt er seine Karte für dieses Spiel in der App frei. Alle Mitglieder sehen sofort, welche Karten für welches Spiel frei sind, und können sich darauf bewerben. Der Besitzer entscheidet manuell, wem er die Karte gibt – es gibt keine automatische Vergabe nach Reihenfolge oder Losverfahren. Benachrichtigungen laufen ausschließlich in-app, es ist kein E-Mail-Versand vorgesehen.
+Kann ein Dauerkarten-Besitzer ein Spiel nicht besuchen, gibt er seine Karte für dieses Spiel in der App frei. Alle Mitglieder sehen sofort, welche Karten für welches Spiel frei sind, und können sich darauf bewerben. Mitglieder können außerdem schon vor einer Freigabe **Interesse** an einem Spiel anmelden; Besitzer sehen diese Interessenten und können ihre Karte direkt an sie vergeben. Der Besitzer entscheidet manuell, wem er die Karte gibt – es gibt keine automatische Vergabe nach Reihenfolge oder Losverfahren. Benachrichtigungen laufen in-app (Glocke im Header), es ist kein E-Mail-Versand vorgesehen.
 
-Ablauf in Kurzform: **Freigabe** durch DK-Besitzer → **Bewerbung** durch Mitglieder → **Entscheidung** durch DK-Besitzer → **Vergabe**.
+Ablauf in Kurzform: **Freigabe** durch DK-Besitzer → **Bewerbung** durch Mitglieder (oder vorher **Interesse**) → **Entscheidung** durch DK-Besitzer → **Vergabe**.
 
 ## Tech-Stack
 
-- Frontend: SvelteKit 5 (mit Runes: `$props`, `$state`, `$effect`)
+- Frontend: SvelteKit 5 (mit Runes: `$props`, `$state`, `$effect`, `$derived`)
 - Datenbank: PostgreSQL über Supabase, Zugriff via Drizzle ORM
-- Hosting: Netlify
+- Hosting: Netlify (`adapter-netlify`, plus eine Netlify Scheduled Function für den täglichen Spielplan-Sync)
 - Icons: `@lucide/svelte` (Nachfolger von `lucide-svelte`, welches deprecated wurde)
-- Karten: Leaflet.js
+- Karten: Leaflet.js (als Abhängigkeit installiert, im Code noch nicht verwendet)
 - Styling: Custom CSS, mobile-first ab 375px, Desktop begrenzt auf max. 720px
 - Schriften: Inter (UI-Text) und JetBrains Mono (Zahlen/Daten)
+- Installierbar als Web-App (Manifest + Service Worker ohne Caching)
 - Entwicklung: VS Code, GitHub
 
 Supabase wurde gegenüber Neon und MongoDB bevorzugt, weil Auth und Row Level Security bereits eingebaut sind und kein separates Auth-System nötig ist.
 
 ## Datenbankstruktur
 
-Das vollständige ER-Diagramm liegt unter `DB-stucture/seefuechse_er_diagramm_V2.html`. Die zentralen Tabellen:
+Das ER-Diagramm unter `DB-stucture/seefuechse_er_diagramm_V2.html` zeigt den Planungsstand (Kerntabellen). Maßgeblich ist `src/lib/server/db/schema.ts`. Die Kerntabellen:
 
 ```mermaid
 erDiagram
@@ -55,6 +57,9 @@ erDiagram
   SPIELE ||--o{ FREIGABEN : betrifft
   FREIGABEN ||--o{ BEWERBUNGEN : erhaelt
   MITGLIEDER ||--o{ BEWERBUNGEN : stellt
+  MITGLIEDER ||--o{ INTERESSE : meldet_an
+  SPIELE ||--o{ INTERESSE : betrifft
+  MITGLIEDER ||--o{ BENACHRICHTIGUNGEN : erhaelt
 
   MITGLIEDER {
     uuid id PK
@@ -81,10 +86,13 @@ erDiagram
   SPIELE {
     uuid id PK
     date datum
+    time uhrzeit
     string gegner
     string wettbewerb
     string heim_auswaerts
     string openligadb_id
+    boolean manuell_ueberschrieben
+    timestamp openligadb_aktualisiert_am
   }
   FREIGABEN {
     uuid id PK
@@ -100,94 +108,138 @@ erDiagram
     string status
     timestamp erstellt_am
   }
+  INTERESSE {
+    uuid id PK
+    uuid mitglied_id FK
+    uuid spiel_id FK
+    timestamp erstellt_am
+  }
+  BENACHRICHTIGUNGEN {
+    uuid id PK
+    uuid mitglied_id FK
+    string typ
+    string titel
+    string text
+    string link
+    timestamp gelesen_am
+    timestamp erstellt_am
+  }
 ```
 
-Die `id` von `mitglieder` ist zugleich Foreign Key auf `auth.users.id` (Supabase verwaltet diese Tabelle selbst, daher gibt es bei `mitglieder` kein eigenes Passwort-Feld mehr – das war im ursprünglichen Diagramm noch vorgesehen, wurde aber bewusst entfernt). Die `status`-Felder sind als Postgres-Enums implementiert, nicht als freier Text:
+Die `id` von `mitglieder` ist zugleich Foreign Key auf `auth.users.id` (Supabase verwaltet diese Tabelle selbst, daher gibt es bei `mitglieder` kein eigenes Passwort-Feld). Die `status`-Felder sind als Postgres-Enums implementiert, nicht als freier Text:
 
 - `mitglieder.status`: `ausstehend` / `aktiv` / `abgelehnt`
 - `freigaben.status`: `offen` / `vergeben` / `zurueckgezogen`
 - `bewerbungen.status`: `angefragt` / `angenommen` / `abgelehnt`
+- `benachrichtigungen.typ`: `neue_anfrage` / `anfrage_angenommen` / `anfrage_abgelehnt` / `karte_freigegeben` / `neues_interesse`
 
-Die zentralen Tabellen:
+Alle Tabellen in Kürze:
 
-- **mitglieder** – Stammdaten der Mitglieder (bei Supabase per FK an `auth.users`, kein eigenes Passwort-Feld); `status` steuert den Freischaltungs-Flow (siehe Rollensystem/Verwaltung)
+- **mitglieder** – Stammdaten der Mitglieder (per FK an `auth.users`); `status` steuert den Freischaltungs-Flow
 - **rollen** – verfügbare Rollen (Admin, Vorstand, Mitglied)
-- **mitglied_rollen** – Verknüpfungstabelle, da eine Person mehrere Rollen gleichzeitig haben kann
+- **mitglied_rollen** – Verknüpfungstabelle Mitglied ↔ Rolle (many-to-many)
 - **dauerkarten** – die 12 Dauerkarten + 2 Fanclubkarten, jeweils einem Besitzer zugeordnet; `bezeichnung` unterscheidet mehrere Karten (z. B. „DK 1", „Fanclubkarte 1")
-- **spiele** – Spielplan, inkl. `openligadb_id` für den automatischen Abgleich (aktuell noch nicht automatisiert, siehe Offene Punkte)
-- **freigaben** – verknüpft eine Dauerkarte mit einem Spiel sobald sie freigegeben wird; `status` läuft zwischen `offen`, `vergeben` und `zurueckgezogen`
-- **bewerbungen** – Bewerbungen von Mitgliedern auf eine Freigabe; `status` läuft zwischen `angefragt`, `angenommen` und `abgelehnt`
+- **spiele** – Spielplan mit Datum und Anstoßzeit (`uhrzeit`, null = unbekannt); `openligadb_id` verknüpft das Spiel mit OpenLigaDB, `manuell_ueberschrieben` schützt Handkorrekturen vor dem Sync
+- **freigaben** – verknüpft eine Dauerkarte mit einem Spiel, sobald sie freigegeben wird
+- **bewerbungen** – Bewerbungen von Mitgliedern auf eine Freigabe (eine pro Mitglied und Freigabe)
+- **interesse** – Interessensbekundung eines Mitglieds für ein Spiel, unabhängig von einer Freigabe (eine pro Mitglied und Spiel)
+- **benachrichtigungen** – In-App-Benachrichtigungen je Mitglied (Glocke), `gelesen_am` null = ungelesen
+- **push_abos** – Web-Push-Abos je Gerät/Browser (Endpoint und Schlüssel); Tabelle angelegt, im Code noch nicht verwendet
+- **benachrichtigung_einstellungen** – Push an/aus je Mitglied und Benachrichtigungstyp; Tabelle angelegt, im Code noch nicht verwendet
+- **sync_laeufe** – Protokoll der Spielplan-Syncs (Zeitpunkt, Quelle `cron`/`manuell`, Zähler, Hinweise), Einträge älter als 90 Tage werden automatisch gelöscht
 
 Wichtig: Der „DK-Besitzer" ist keine eigene Rolle, sondern ergibt sich aus der Zuordnung in `dauerkarten`.
 
+**Schema-Änderungen** werden manuell im Supabase SQL Editor angewendet, `schema.ts` wird von Hand nachgezogen. Kein `drizzle-kit push` ausführen: Der UNIQUE-Index auf `spiele.openligadb_id` existiert nur in der Datenbank und würde entfernt.
+
 ## Rollensystem
 
-Drei Rollen: Admin, Vorstand, Mitglied. Sie sind many-to-many über `mitglied_rollen` verknüpft, eine Person kann also z. B. gleichzeitig Vorstand und Mitglied sein. Vorstand hat den gleichen Funktionsumfang wie Admin, mit einer Ausnahme: die Seite „Rollen verwalten" ist ausschließlich Admins vorbehalten.
+Drei Rollen: Admin, Vorstand, Mitglied. Sie sind many-to-many über `mitglied_rollen` verknüpft. Vorstand hat den gleichen Funktionsumfang wie Admin, mit einer Ausnahme: die Seite „Rollen verwalten" ist ausschließlich Admins vorbehalten.
 
-Technisch wird das über eine private Hilfsfunktion `hatVerwaltungsRolle(userId)` geprüft (joint `mitglied_rollen` mit `rollen`, prüft auf `'admin'` oder `'vorstand'`), die sowohl im `load()` einer Seite als auch nochmal in jeder einzelnen Server-Action aufgerufen wird (Defense-in-Depth – die Berechtigung wird nicht nur durch Verstecken von UI-Elementen erzwungen).
+Technisch wird das über `hatVerwaltungsRolle(userId)` bzw. `hatAdminRolle(userId)` in `src/lib/server/rollen.ts` geprüft, sowohl im `load()` einer Seite als auch nochmal in jeder einzelnen Server-Action (Defense-in-Depth – die Berechtigung wird nicht nur durch Verstecken von UI-Elementen erzwungen).
 
-Aktuell gibt es noch keine UI zum Zuweisen von Rollen (siehe Offene Punkte) – Rollen-Zuordnungen müssen bislang manuell per Supabase SQL Editor in `mitglied_rollen` eingetragen werden.
+Rollen werden in der App unter `/verwaltung/rollen` zugewiesen. Die Seite setzt je Mitglied genau eine Rolle (bestehende Zuordnungen werden ersetzt).
 
 ## Seiten-Übersicht
 
 Mockups dazu liegen unter `mockups/`.
 
-- **Start** (`/`) – Dashboard mit Begrüßung, offenen Bewerbungen auf die eigene Karte (falls DK-Besitzer), den nächsten 3 Spielen und allen aktuell club-weit freigegebenen Karten
-- **Spielplan** (`/spielplan`) – alle Spiele der Saison, Tabs Kommende/Vergangene, Filter nach Liga/Pokal/Europa, zeigt freie Karten je Spiel; jede Spielkachel verlinkt zur Detailseite
-- **Spieldetail** (`/spielplan/[id]`) – Übersicht zu einem einzelnen Spiel; besitzt der eingeloggte Nutzer eine eigene Dauerkarte, kann er sie direkt von hier aus freigeben/zurückziehen und Bewerbungen entscheiden (gleiche Funktion wie auf „Meine Dauerkarte", nur pro Spiel statt als Liste)
-- **Meine Dauerkarte** (`/karte`) – nur für DK-Besitzer: eigene Dauerkarte je kommendem Spiel freigeben/behalten, Bewerbungen einsehen und vergeben
-- **Anfragen** (`/anfragen`) – für Mitglieder ohne eigene Dauerkarte: eigene offene Bewerbungen und Verlauf
-- **Verwaltung** (`/verwaltung`) – für Admin/Vorstand: Freischaltung wartender Mitglieder (Status `ausstehend` → `aktiv`/`abgelehnt`); Dauerkarten-Zuordnungs-Übersicht und OpenLigaDB-Sync-Status sind als Mockup vorhanden, technisch aber noch nicht umgesetzt
-- **Verwaltung → Rollen verwalten** (`/verwaltung/rollen`) – nur Admin: Rollen den Mitgliedern zuweisen
+- **Start** (`/`) – Dashboard mit Begrüßung, offenen Bewerbungen auf die eigene Karte (falls DK-Besitzer), den nächsten Spielen und allen aktuell club-weit freigegebenen Karten
+- **Spielplan** (`/spielplan`) – alle Spiele der Saison, Tabs Kommende/Vergangene, Filter Liga/Pokal/Europa/Testspiele, zeigt freie Karten je Spiel und kennzeichnet vorläufige Anstoßzeiten; jede Spielkachel verlinkt zur Detailseite
+- **Spieldetail** (`/spielplan/[id]`) – ein einzelnes Spiel: eigene Karte freigeben/zurückziehen, Bewerbungen entscheiden, an Interessenten direkt vergeben; Mitglieder können sich bewerben oder Interesse anmelden/zurückziehen
+- **Meine Dauerkarte** (`/karte`) – nur für DK-Besitzer: eigene Dauerkarte je kommendem Spiel freigeben/behalten, Bewerbungen einsehen und vergeben, Anzahl Interessenten je Spiel
+- **Anfragen** (`/anfragen`) – für alle Mitglieder: eigene Interesse-Anmeldungen und Bewerbungen (zurückziehbar), für DK-Besitzer zusätzlich eigene offene Freigaben mit Bewerberliste
+- **Benachrichtigungen** (`/benachrichtigungen`) – letzte 50 Benachrichtigungen, einzeln öffnen (markiert als gelesen) oder alle als gelesen markieren; erreichbar über die Glocke im Header mit Ungelesen-Zähler
+- **Verwaltung** (`/verwaltung`) – für Admin/Vorstand: Freischaltung wartender Mitglieder, Spielplan-Sync (Button, letzter Lauf, Stichtag bestätigter Anstoßzeiten), Links zu Spielplan- und Rollenverwaltung; die Dauerkarten-Zuordnung ist noch Platzhaltertext
+- **Verwaltung → Spielplan** (`/verwaltung/spielplan`) – Spiele anlegen, bearbeiten, löschen; Erkennung ähnlicher Vereinsnamen
+- **Verwaltung → Rollen verwalten** (`/verwaltung/rollen`) – nur Admin: Rolle zuweisen, Name/E-Mail ändern, Passwort-Mail senden
+- **Login, Registrieren, Passwort ändern, Warten** (`/login`, `/registrieren`, `/passwort-aendern`, `/warten`) – Auth-Seiten; `/warten` sehen Mitglieder mit Status `ausstehend`
+- **Cron-Endpoint** (`POST /api/cron/spielplan-sync`) – kein Seitenaufruf, wird von der Netlify Scheduled Function per Token aufgerufen
 
 ## Implementierungsstand
 
 | Bereich | Status |
 | --- | --- |
-| Auth (Login, Registrierung, Freischaltung-Workflow) | ✅ fertig |
+| Auth (Login, Registrierung, Freischaltung-Workflow, Passwort zurücksetzen) | ✅ fertig |
 | Verwaltung → Mitglieder-Freischaltung | ✅ fertig |
 | Start-Dashboard mit echten Daten | ✅ fertig |
-| Spielplan (Liste, Tabs, Filter) | ✅ fertig |
-| Spieldetail-Seite | ✅ fertig |
+| Spielplan (Liste, Tabs, Filter, „vorläufig"-Kennzeichnung) | ✅ fertig |
+| Spieldetail-Seite (Freigabe, Bewerbung, Interesse, Vergabe) | ✅ fertig |
 | Meine Dauerkarte (Freigeben/Vergeben) | ✅ fertig |
-| NavBar (DK-Besitzer-Variante) | ✅ fertig |
-| Verwaltung → Rollen verwalten (UI) | 🚧 nur Platzhalter |
+| Anfragen-Seite | ✅ fertig |
+| Interesse anmelden/zurückziehen, Vergabe an Interessenten | ✅ fertig |
+| NavBar („Anfragen" für alle, „Dauerkarte" nur für Besitzer, „Verwaltung" nur für Admin/Vorstand) | ✅ fertig |
+| Verwaltung → Rollen verwalten | ✅ fertig |
+| Verwaltung → Spielplan pflegen (anlegen, bearbeiten, löschen) | ✅ fertig |
+| OpenLigaDB-Sync (täglich per Netlify Scheduled Function + Button in `/verwaltung`, Protokoll in `sync_laeufe`) | ✅ fertig |
+| In-App-Benachrichtigungen (Glocke, Liste, gelesen markieren) | ✅ fertig |
+| Benachrichtigung bei Terminänderung durch den Sync | 📋 noch nicht begonnen |
+| Web-Push | 🚧 nur vorbereitet (Tabellen, auskommentierter Service-Worker-Code) |
 | Verwaltung → Dauerkarten-Zuordnung (echte Daten) | 🚧 nur Platzhalter |
-| Anfragen-Seite (Mitglieder ohne Dauerkarte) | 🚧 nur Platzhalter |
-| NavBar-Variante für Mitglieder ohne Dauerkarte | 📋 noch nicht begonnen |
-| OpenLigaDB-Sync (automatisch) | 📋 noch nicht begonnen |
-| In-App-Benachrichtigungen | 📋 noch nicht begonnen |
 | Dark/Light-Mode-Toggle | 📋 bewusst zurückgestellt |
 
-Details zu offenen Punkten siehe unten, ausführlicher Verlauf inkl. aufgetretener Probleme in `.github/copilot-instructions.md`.
+Details zu offenen Punkten siehe unten, ausführlicher Kontext in `.github/copilot-instructions.md`.
 
 ## Projektstruktur
 
 ```
-SEEFUECHSE/
+seefuechse/
+├── .github/copilot-instructions.md  # Entwicklungskontext für KI-Assistenten
 ├── DB-stucture/              # ER-Diagramme (Planungsstand)
 ├── mockups/                  # Visuelle Mockups der Seiten
+├── netlify/functions/        # Scheduled Function für den täglichen Spielplan-Sync
+├── testing/                  # Notizen zu manuellen Tests, Prozessgrafiken
+├── tools/                    # Hilfsseite zum Erzeugen der App-Icons
 ├── src/
 │   ├── routes/
 │   │   ├── +page.svelte        # Start-Dashboard
-│   │   ├── login/, registrieren/, logout/, warten/
+│   │   ├── login/, registrieren/, logout/, warten/, passwort-aendern/
 │   │   ├── spielplan/          # Liste
 │   │   │   └── [id]/           # Spieldetail
 │   │   ├── karte/              # Meine Dauerkarte (nur DK-Besitzer)
-│   │   ├── anfragen/           # noch Platzhalter
-│   │   └── verwaltung/
-│   │       └── rollen/         # noch Platzhalter
+│   │   ├── anfragen/           # Interesse-Anmeldungen und Bewerbungen
+│   │   ├── benachrichtigungen/ # Benachrichtigungsliste
+│   │   ├── api/cron/spielplan-sync/  # Cron-Endpoint (Token-geschützt)
+│   │   └── verwaltung/         # Freischaltung, Sync-Karte
+│   │       ├── spielplan/      # Spiele pflegen
+│   │       └── rollen/         # Rollen verwalten (nur Admin)
 │   ├── lib/
 │   │   ├── server/
-│   │   │   ├── db/             # Drizzle-Schema (schema.ts) + DB-Client (index.ts)
-│   │   │   └── freigaben.ts    # geteilte Freigabe-Geschäftslogik (toggleFreigabe, vergebenAn)
-│   │   ├── components/         # Card, Header, MatchCard, NavBar, FreigabeZeile
+│   │   │   ├── db/             # Drizzle-Schema, DB-Client, Fehlerhilfen
+│   │   │   ├── freigaben.ts, bewerbungen.ts, interesse.ts  # Freigabe-/Bewerbungslogik
+│   │   │   ├── benachrichtigungen.ts  # In-App-Benachrichtigungen
+│   │   │   ├── spiele.ts, vereinsnamen.ts  # Spielpflege, Vereinsnamen-Abgleich
+│   │   │   ├── spielplanSync.ts, spielplanTermine.ts  # OpenLigaDB-Sync, „vorläufig"
+│   │   │   ├── rollen.ts, aktionen.ts, supabaseAdmin.ts
+│   │   ├── components/         # Card, Header, MatchCard, NavBar, FreigabeZeile, FehlerHinweis
+│   │   ├── zeit.ts, enhance.ts
 │   │   └── supabase.ts
 │   ├── hooks.server.ts         # Auth-Session + Routen-Schutz
+│   ├── service-worker.ts       # ohne Caching, Push vorbereitet
 │   ├── app.css                 # Design-Tokens
 │   ├── app.html
 │   └── app.d.ts
-├── static/
+├── static/                   # Icons, Manifest
 ├── drizzle.config.ts
 ├── svelte.config.js
 ├── vite.config.js
@@ -195,37 +247,61 @@ SEEFUECHSE/
 └── .env.example
 ```
 
+Nicht im Repo (per `.gitignore`): `build/` und `.netlify/` (Build-Artefakte), `.svelte-kit/`, `node_modules/`, `.env`.
+
 ## Spielplan-Synchronisation
 
-Spielplan und Ergebnisse werden automatisch über die OpenLigaDB-API synchronisiert statt per Webscraping, um den Admin-Aufwand gering zu halten. OpenLigaDB deckt Bundesliga, 2. Bundesliga, 3. Liga und DFB-Pokal ab (`bl1`/`bl2`/`bl3`/`dfb`). Die Europa League wird dort nicht abgebildet – dafür ist noch eine manuelle Pflege oder eine separate Lösung nötig (siehe offene Punkte).
+Spielplan und Anstoßzeiten kommen aus der kostenlosen OpenLigaDB-API (`https://api.openligadb.de/getmatchdata/{kürzel}/{saison}`), nicht per Webscraping. Code: `src/lib/server/spielplanSync.ts`.
+
+- **Quellen (Saison 2026/27):** `bl1` → Bundesliga, `dfb` → DFB-Pokal, `uecl{saison}` (aktuell `uecl2026`) → Conference League. Freiburg spielt 2026/27 in der Conference League; die Europa League wird nicht synchronisiert. Übernommen werden nur Spiele mit „SC Freiburg".
+- **Saisonwechsel:** `AKTUELLE_SAISON` und die Liga-Kürzel in `LIGEN` müssen jährlich angepasst und gegen OpenLigaDB geprüft werden.
+- **Anstoßzeit:** wird in der Spalte `spiele.uhrzeit` gespeichert (deutsche Ortszeit, null = unbekannt).
+- **„vorläufig":** Die DFL legt Bundesliga-Anstoßzeiten in Etappen fest, bis dahin steht in OpenLigaDB der Standard-Slot. Die App leitet zur Laufzeit ab, welche Bundesliga-Zeiten noch nicht bestätigt sind, und kennzeichnet sie im Spielplan als „vorläufig" (`spielplanTermine.ts`). Die Verwaltung zeigt „Anstoßzeiten bestätigt bis: …".
+- **Schreibweg:** Upsert per `openligadb_id`. Ein bestehendes Spiel wird nur überschrieben, wenn sich Datum, Uhrzeit, Gegner, Wettbewerb oder Heim/Auswärts geändert haben. Spiele, die in der API fehlen, werden nie gelöscht.
+- **Schutz manueller Änderungen:** Wird ein synchronisiertes Spiel in `/verwaltung/spielplan` fachlich geändert, setzt die App `manuell_ueberschrieben = true`; der Sync lässt dieses Spiel dann in Ruhe. Zurücksetzen geht bisher nur per SQL. Von Hand angelegte Spiele ohne `openligadb_id` erkennt der Sync nicht – daher zuerst syncen, dann ergänzen.
+- **Ablauf automatisch:** Die Netlify Scheduled Function `netlify/functions/spielplan-sync-taeglich.mts` läuft täglich um 04:00 UTC und ruft per `POST /api/cron/spielplan-sync` mit `Authorization: Bearer <CRON_SECRET>` den Endpoint auf. Der Endpoint führt den Sync aus und schreibt das Ergebnis in `sync_laeufe`. Scheduled Functions laufen nur auf dem Production-Deploy.
+- **Ablauf manuell:** Der Button „Synchronisieren" in `/verwaltung` startet denselben Lauf (Quelle `manuell`) und zeigt das Ergebnis inkl. verschobener Termine.
+- **Fehler:** Schlägt eine Liga fehl (Timeout 8 s je Abruf), laufen die anderen weiter; der Lauf wird als fehlgeschlagen protokolliert und die Verwaltung zeigt eine Warnung.
 
 ## Setup / Lokale Entwicklung
 
-1. Node.js (LTS, mind. v20) muss installiert sein. **Hinweis:** `npm run check` läuft mit Node v24 aktuell nicht sauber durch (Versionsmismatch beim `svelte-kit sync`-Schritt mit `@sveltejs/kit@2.9`) – `npm run dev` ist davon nicht betroffen, für saubere Type-Checks empfiehlt sich aber eine LTS-Version (20 oder 22).
+1. Node.js (LTS, mind. v20) muss installiert sein. **Hinweis:** `npm run check` läuft mit Node v24 nicht sauber durch – `npm run dev` ist davon nicht betroffen, für saubere Type-Checks empfiehlt sich eine LTS-Version (20 oder 22).
 2. `npm install`
-3. `.env.example` zu `.env` kopieren und mit den echten Supabase-Zugangsdaten füllen. Sonderzeichen im Passwort der `DATABASE_URL` müssen URL-encodiert sein (z. B. `%` → `%25`, `^` → `%5E`, `)` → `%29`).
-4. `npm run dev` startet den Dev-Server unter `http://localhost:5173`.
-5. **Im Firmennetz/Geschäftslaptop:** ausgehende Verbindungen zur Supabase-DB (Port 6543/5432 + ICMP) sind ggf. blockiert. Workaround: für alles mit direkter DB-Verbindung (`db:push`, `db:studio`, `npm run dev` mit echten Queries) einen Mobile Hotspot nutzen; reiner Code ohne DB-Zugriff läuft weiterhin im Firmennetz.
-6. **Repo-Speicherort:** nicht in einem iCloud-Drive-synchronisierten Ordner (z. B. `~/Desktop`) ablegen – das kann zu korrupten Git-Referenzen führen (siehe `.github/copilot-instructions.md`).
-7. Für Testdaten (alle 7 Tabellen befüllt, inkl. einloggbarer Test-Mitglieder) liegt ein SQL-Seed-Skript bereit, das direkt im Supabase SQL Editor ausgeführt werden kann (nicht im Repo, bei Bedarf erneut generieren lassen).
+3. `.env.example` zu `.env` kopieren und füllen:
+   - `DATABASE_URL` – Supabase Transaction Pooler (Port 6543). Sonderzeichen im Passwort müssen URL-encodiert sein (z. B. `%` → `%25`, `^` → `%5E`, `)` → `%29`).
+   - `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` – für Supabase Auth.
+   - `SUPABASE_SERVICE_ROLE_KEY` – Admin-Schlüssel (E-Mail-Änderung in der Rollenverwaltung), nur serverseitig.
+   - `CRON_SECRET` – gemeinsames Geheimnis für den Cron-Endpoint (z. B. `openssl rand -hex 32`). Ohne Wert antwortet der Endpoint mit 503.
+   - `SITE_BASE_URL` (optional) – Basis-URL der App für die Scheduled Function, falls Netlify `URL` nicht setzt.
+4. `npm run dev` startet den Dev-Server unter `http://localhost:5173`. Den Cron-Endpoint lokal testen: `curl -X POST -H "Authorization: Bearer <CRON_SECRET>" http://localhost:5173/api/cron/spielplan-sync`.
+5. **Achtung:** Lokal wird dieselbe Datenbank wie auf der Live-Seite genutzt (siehe Deployment).
+6. **Im Firmennetz/Geschäftslaptop:** ausgehende Verbindungen zur Supabase-DB (Port 6543/5432) sind ggf. blockiert. Workaround: Mobile Hotspot nutzen.
+7. **Repo-Speicherort:** nicht in einem iCloud-Drive-synchronisierten Ordner (z. B. `~/Desktop`) ablegen – das kann zu korrupten Git-Referenzen führen.
+8. Den Spielplan füllt der Sync (Button in `/verwaltung`). Für weitere Testdaten gibt es kein Seed-Skript im Repo.
+
+## Deployment
+
+- **Live:** https://seefuechse.netlify.app (Netlify, Branch `main`, automatisches Publishing).
+- **Netlify-Umgebungsvariablen:** `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` (als Secret markiert) sowie `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` (nicht als Secret markiert, da sie im Browser-Code landen; sonst bricht das Secret-Scanning den Build ab). `URL` setzt Netlify selbst.
+- **Supabase Auth → URL Configuration:** Site URL `https://seefuechse.netlify.app`; Redirect URLs `https://seefuechse.netlify.app/**` und `http://localhost:5173/**`.
+- **Eine Datenbank:** Lokale Entwicklung und Live-Seite greifen auf dieselbe Supabase-Datenbank zu. Was lokal geändert wird, ist sofort live sichtbar.
+- **Scheduled Function** testen: in Netlify unter Functions → „Run now".
 
 ## Git-Konventionen
 
-Commits folgen der Konvention `feat:` / `docs:` / `fix:` / `refactor:` (z. B. `feat: Drizzle-Schema aus ER-Diagramm umgesetzt`).
+Commits folgen der Konvention `feat:` / `docs:` / `fix:` / `refactor:` mit Bullet-Body (z. B. `feat: Drizzle-Schema aus ER-Diagramm umgesetzt`).
 
-Größere Implementierungsschritte werden häufig als strukturierter Prompt für GitHub Copilot formuliert und dann in VS Code ausgeführt. Wiederkehrende Konventionen und der Grund für bestimmte Architekturentscheidungen stehen in `.github/copilot-instructions.md`, damit Copilot (und neue Mitwirkende) sie nicht aus dem Code allein erraten müssen.
+Größere Implementierungsschritte werden häufig als strukturierter Prompt für GitHub Copilot formuliert und dann in VS Code ausgeführt. Wiederkehrende Konventionen und der Grund für bestimmte Architekturentscheidungen stehen in `.github/copilot-instructions.md`.
 
 ## Offene Punkte
 
-- **Anfragen-Seite** (für Mitglieder ohne Dauerkarte) ist noch reiner Platzhalter
-- **Rollen-Verwaltungs-UI** (`/verwaltung/rollen`) ist noch reiner Platzhalter – Rollen müssen aktuell per SQL Editor zugewiesen werden
-- **Dauerkarten-Zuordnung in der Verwaltung** zeigt noch keine echten Daten (nur Platzhaltertext)
-- **NavBar-Variante für Mitglieder ohne Dauerkarte** (Tab „Anfragen" statt „Dauerkarte") noch nicht umgesetzt
-- **Anstoßzeit fehlt im Schema:** `spiele.datum` ist nur ein `date`-Feld ohne Uhrzeit-Komponente; `MatchCard` zeigt deshalb aktuell keine Uhrzeit an. Müsste ergänzt werden, sobald der OpenLigaDB-Sync (der die Anstoßzeit liefert) oder eine manuelle Pflege kommt
-- **OpenLigaDB-Sync** ist noch nicht automatisiert (Spielplan-Daten kommen aktuell nur aus dem Seed-Skript); geplant über Netlify Scheduled Functions + Upsert per `externalId`/`matchID`
-- Europa-League-Spiele: manuelle Pflege oder alternative Datenquelle, da OpenLigaDB das nicht abdeckt
-- Supabase ggf. self-hosten per Docker auf eigener NAS, um nicht an Free-Tier-Limits gebunden zu sein (Auto-Pause nach 1 Woche Inaktivität, keine automatischen Backups)
-- Genauer Einsatzzweck von Leaflet.js noch nicht im Detail festgelegt (z. B. Stadion-Standorte oder Anfahrt zu Auswärtsspielen)
-- Technische Umsetzung der In-App-Benachrichtigungen (Supabase Realtime vs. Polling) noch offen
-- Teststrategie noch nicht festgelegt (bisher manuelles Durchtesten mit Seed-Daten)
-- Mehrfach-Dauerkarten pro Besitzer werden vom Dashboard/Karte-Seite noch nicht vollständig unterstützt (es wird aktuell nur die erste gefundene Dauerkarte einer Person berücksichtigt)
+- **Dauerkarten-Zuordnung in der Verwaltung** zeigt nur Platzhaltertext („Folgt im nächsten Schritt").
+- **Web-Push:** Tabellen `push_abos` und `benachrichtigung_einstellungen` existieren, Versand (`benachrichtigen()`) und Service-Worker-Handler sind noch nicht umgesetzt.
+- **Benachrichtigung bei Terminänderungen:** Der Sync liefert verschobene Termine (`terminAenderungen`), daraus werden noch keine Benachrichtigungen erzeugt.
+- **`manuell_ueberschrieben` zurücksetzen** geht nur per SQL, es gibt keinen Button.
+- **Mehrfach-Dauerkarten pro Besitzer:** `/karte`, `/spielplan/[id]` und das Dashboard berücksichtigen nur die erste gefundene Karte einer Person.
+- **Saisonwechsel 2027/28:** `AKTUELLE_SAISON` und Liga-Kürzel anpassen.
+- **Spielplan-UI:** Badges für Heim/Auswärts und Wettbewerb haben je eine einheitliche Farbe (Wettbewerbe nicht unterschieden).
+- **Leaflet.js** ist installiert, aber nirgends eingebunden; Einsatzzweck offen.
+- **Teststrategie** nicht festgelegt, keine automatisierten Tests im Repo.
+- Supabase ggf. self-hosten (Free Tier: Auto-Pause nach 1 Woche Inaktivität, keine automatischen Backups).
