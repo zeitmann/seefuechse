@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { mitglieder } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { mitglieder, syncLaeufe } from '$lib/server/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
 import { hatVerwaltungsRolle, hatAdminRolle } from '$lib/server/rollen';
-import { synchronisiereSpielplan } from '$lib/server/spielplanSync';
+import { AKTUELLE_SAISON, fuehreSyncMitProtokollAus } from '$lib/server/spielplanSync';
 import { ermittleTerminierungsStichtag } from '$lib/server/spielplanTermine';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -14,6 +14,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		return {
 			kannVerwalten: false,
 			terminierungsStichtag: null,
+			letzterSync: null,
+			syncSaison: AKTUELLE_SAISON,
 			istAdmin: false,
 			ausstehendeMitglieder: [] as { id: string; name: string; email: string }[]
 		};
@@ -26,13 +28,29 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(mitglieder)
 		.where(eq(mitglieder.status, 'ausstehend'));
 
-	const terminierungsStichtag = await ermittleTerminierungsStichtag();
+	const [terminierungsStichtag, [letzterSync]] = await Promise.all([
+		ermittleTerminierungsStichtag(),
+		db
+			.select({
+				gestartetAm: syncLaeufe.gestartetAm,
+				quelle: syncLaeufe.quelle,
+				erfolgreich: syncLaeufe.erfolgreich,
+				hinweise: syncLaeufe.hinweise
+			})
+			.from(syncLaeufe)
+			.orderBy(desc(syncLaeufe.gestartetAm))
+			.limit(1)
+	]);
 
-	return { kannVerwalten: true, istAdmin, ausstehendeMitglieder, terminierungsStichtag };
+	return {
+		kannVerwalten: true,
+		istAdmin,
+		ausstehendeMitglieder,
+		terminierungsStichtag,
+		letzterSync: letzterSync ?? null,
+		syncSaison: AKTUELLE_SAISON
+	};
 };
-
-/** Saison des OpenLigaDB-Syncs (2026 = Saison 2026/27). */
-const SYNC_SAISON = 2026;
 
 export const actions: Actions = {
 	/**
@@ -45,7 +63,8 @@ export const actions: Actions = {
 			error(403, 'Keine Berechtigung');
 		}
 
-		const sync = await synchronisiereSpielplan(SYNC_SAISON);
+		// Wirft nicht; Fehler landen als erfolgreich = false im Protokoll und Ergebnis.
+		const sync = await fuehreSyncMitProtokollAus('manuell');
 		return { sync };
 	},
 

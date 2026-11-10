@@ -2,12 +2,38 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { RefreshCw } from '@lucide/svelte';
+	import { formatiereZeitpunkt } from '$lib/zeit';
 	import type { SyncErgebnis } from '$lib/server/spielplanSync';
+
+	type LetzterSync = {
+		gestartetAm: Date;
+		quelle: 'cron' | 'manuell';
+		erfolgreich: boolean;
+		hinweise: string | null;
+	};
 
 	let {
 		ergebnis,
-		terminierungsStichtag
-	}: { ergebnis: SyncErgebnis | null; terminierungsStichtag: string | null } = $props();
+		terminierungsStichtag,
+		letzterSync,
+		saison
+	}: {
+		ergebnis: SyncErgebnis | null;
+		terminierungsStichtag: string | null;
+		letzterSync: LetzterSync | null;
+		saison: number;
+	} = $props();
+
+	// 2026 → '2026/27'
+	const saisonText = $derived(`${saison}/${String((saison + 1) % 100).padStart(2, '0')}`);
+
+	const letzterSyncText = $derived(
+		letzterSync
+			? `${formatiereZeitpunkt(letzterSync.gestartetAm)} (${
+					letzterSync.quelle === 'cron' ? 'automatisch' : 'manuell'
+				})`
+			: null
+	);
 
 	// 'JJJJ-MM-TT' → 'TT.MM.JJJJ'
 	const stichtagText = $derived(
@@ -46,11 +72,27 @@
 		</span>
 		<div class="sync-text">
 			<h2>Spielplan-Sync</h2>
-			<p>Saison 2026/27 via OpenLigaDB · Bundesliga, DFB-Pokal, Conference League</p>
+			<p>Saison {saisonText} via OpenLigaDB · Bundesliga, DFB-Pokal, Conference League</p>
 		</div>
 	</div>
 
-	<p class="stichtag">
+	{#if !letzterSync}
+		<p class="status-zeile">Noch nicht synchronisiert</p>
+	{:else if letzterSync.erfolgreich}
+		<p class="status-zeile">
+			Zuletzt synchronisiert: <strong>{letzterSyncText}</strong>
+		</p>
+	{:else}
+		<div class="sync-warnung" role="alert">
+			<p class="warnung-titel">Letzter Sync fehlgeschlagen</p>
+			<p class="warnung-zeit">{letzterSyncText}</p>
+			{#if letzterSync.hinweise}
+				<p class="warnung-hinweise">{letzterSync.hinweise}</p>
+			{/if}
+		</div>
+	{/if}
+
+	<p class="status-zeile">
 		Anstoßzeiten bestätigt bis: <strong>{stichtagText}</strong>
 	</p>
 
@@ -144,15 +186,44 @@
 		color: var(--color-text-muted);
 	}
 
-	.stichtag {
+	.status-zeile {
 		margin: 0;
 		font-size: 13px;
 		color: var(--color-text-muted);
 	}
 
-	.stichtag strong {
+	.status-zeile strong {
 		color: var(--color-text);
 		font-family: var(--font-mono);
+	}
+
+	.sync-warnung {
+		padding: 10px 12px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-accent);
+		background: var(--color-accent-muted);
+		font-size: 13px;
+	}
+
+	.sync-warnung p {
+		margin: 0;
+	}
+
+	.warnung-titel {
+		font-weight: 700;
+		color: var(--color-accent);
+	}
+
+	.warnung-zeit {
+		margin-top: 2px;
+		color: var(--color-text-muted);
+	}
+
+	.warnung-hinweise {
+		margin-top: 6px;
+		color: var(--color-text);
+		/* Hinweise sind zeilenweise gespeichert */
+		white-space: pre-line;
 	}
 
 	form {

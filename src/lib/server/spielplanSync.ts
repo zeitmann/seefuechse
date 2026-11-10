@@ -3,13 +3,23 @@
 // Übernimmt den Spielplan des SC Freiburg aus OpenLigaDB in die Tabelle `spiele`.
 // Phase 1: manuell per Button in /verwaltung ausgelöst (kein Cron).
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { spiele } from '$lib/server/db/schema';
+import { spiele, syncLaeufe } from '$lib/server/db/schema';
 import type { HeimAuswaerts, Wettbewerb } from '$lib/server/spiele';
 import { leerzeichenBereinigen } from '$lib/server/vereinsnamen';
 
 const API_BASIS = 'https://api.openligadb.de/getmatchdata';
+
+/**
+ * Saison für Button und Cron (2026 = Saison 2026/27) – die einzige Stelle.
+ * Achtung: Einige Liga-Kürzel sind saisonabhängig (z. B. 'uecl2026'). Beim
+ * Saisonwechsel beides anpassen und die Kürzel in LIGEN gegen OpenLigaDB prüfen.
+ */
+export const AKTUELLE_SAISON = 2026;
+
+/** Protokollzeilen älter als diese Anzahl Tage werden nach jedem Lauf gelöscht. */
+const PROTOKOLL_AUFBEWAHRUNG_TAGE = 90;
 
 /** Teamname des SC Freiburg in OpenLigaDB (in allen Wettbewerben identisch). */
 const EIGENES_TEAM = 'SC Freiburg';
@@ -58,6 +68,8 @@ export type SyncErgebnis = {
 	unveraendert: number;
 	uebersprungenManuell: number;
 	hinweise: string[];
+	/** Anzahl Ligen, deren Abruf fehlschlug (HTTP-, Netzwerk- oder Formatfehler). */
+	abrufFehler: number;
 	/** Spiele mit verschobenem Datum/Anpfiff – Grundlage für spätere Benachrichtigungen. */
 	terminAenderungen: TerminAenderung[];
 };
@@ -96,32 +108,35 @@ function alsSpielZeile(spiel: OpenLigaSpiel, wettbewerb: Wettbewerb): SpielZeile
 	};
 }
 
-/** Lädt die Freiburg-Spiele einer Liga. Fehler werden als Hinweis gemeldet, nicht geworfen. */
+/**
+ * Lädt die Freiburg-Spiele einer Liga. Fehler werden als Hinweis gemeldet, nicht
+ * geworfen; Rückgabe null = Abruf fehlgeschlagen ([] = erfolgreich, aber leer).
+ */
 async function ligaAbrufen(
 	kuerzel: string,
 	wettbewerb: Wettbewerb,
 	saison: number,
 	hinweise: string[]
-): Promise<SpielZeile[]> {
+): Promise<SpielZeile[] | null> {
 	const url = `${API_BASIS}/${kuerzel}/${saison}`;
 	let daten: unknown;
 	try {
 		const antwort = await fetch(url, { signal: AbortSignal.timeout(ABRUF_TIMEOUT_MS) });
 		if (!antwort.ok) {
 			hinweise.push(`${wettbewerb}: Abruf fehlgeschlagen (HTTP ${antwort.status}).`);
-			return [];
+			return null;
 		}
 		daten = await antwort.json();
 	} catch (e) {
 		const grund =
 			e instanceof Error && e.name === 'TimeoutError' ? 'Zeitüberschreitung' : 'Netzwerkfehler';
 		hinweise.push(`${wettbewerb}: Abruf fehlgeschlagen (${grund}).`);
-		return [];
+		return null;
 	}
 
 	if (!Array.isArray(daten)) {
 		hinweise.push(`${wettbewerb}: Unerwartetes Antwortformat von OpenLigaDB.`);
-		return [];
+		return null;
 	}
 
 	const zeilen: SpielZeile[] = [];
@@ -167,7 +182,9 @@ export async function synchronisiereSpielplan(saison: number): Promise<SyncErgeb
 
 	// Doppelte matchIDs entfernen – sonst bricht ON CONFLICT mit "cannot affect
 	// row a second time" ab.
-	const zeilen = [...new Map(jeLiga.flat().map((z) => [z.openligadbId, z])).values()];
+	const zeilen = [
+		...new Map(jeLiga.flatMap((liga) => liga ?? []).map((z) => [z.openligadbId, z])).values()
+	];
 
 	const ergebnis: SyncErgebnis = {
 		neu: 0,
@@ -175,6 +192,7 @@ export async function synchronisiereSpielplan(saison: number): Promise<SyncErgeb
 		unveraendert: 0,
 		uebersprungenManuell: 0,
 		hinweise,
+		abrufFehler: jeLiga.filter((liga) => liga === null).length,
 		terminAenderungen: []
 	};
 	if (zeilen.length === 0) return ergebnis;
@@ -254,6 +272,70 @@ export async function synchronisiereSpielplan(saison: number): Promise<SyncErgeb
 		if (geschriebenIds.has(z.openligadbId)) continue;
 		if (vorherNachId.get(z.openligadbId)?.manuellUeberschrieben) ergebnis.uebersprungenManuell++;
 		else ergebnis.unveraendert++;
+	}
+
+	return ergebnis;
+}
+
+export type SyncQuelle = 'cron' | 'manuell';
+
+export type ProtokollierterSync = SyncErgebnis & { erfolgreich: boolean };
+
+function fehlerText(e: unknown): string {
+	return (e instanceof Error ? e.message : String(e)).slice(0, 300);
+}
+
+/**
+ * Führt den Sync für AKTUELLE_SAISON aus, schreibt eine Zeile in sync_laeufe
+ * und löscht Protokolle älter als 90 Tage. Wirft nie: auch bei Ausnahmen wird
+ * (wenn möglich) ein Protokoll mit erfolgreich = false geschrieben und ein
+ * Ergebnis zurückgegeben.
+ *
+ * Fehlgeschlagen = Abruffehler einer Liga oder Datenbankfehler. Eine Liga ohne
+ * Freiburg-Spiele ist nur ein Hinweis.
+ */
+export async function fuehreSyncMitProtokollAus(quelle: SyncQuelle): Promise<ProtokollierterSync> {
+	let ergebnis: ProtokollierterSync;
+	try {
+		const sync = await synchronisiereSpielplan(AKTUELLE_SAISON);
+		ergebnis = { ...sync, erfolgreich: sync.abrufFehler === 0 };
+	} catch (e) {
+		console.error('Spielplan-Sync abgebrochen:', e);
+		ergebnis = {
+			neu: 0,
+			geaendert: 0,
+			unveraendert: 0,
+			uebersprungenManuell: 0,
+			hinweise: [`Sync abgebrochen: ${fehlerText(e)}`],
+			abrufFehler: 0,
+			terminAenderungen: [],
+			erfolgreich: false
+		};
+	}
+
+	try {
+		await db.insert(syncLaeufe).values({
+			quelle,
+			saison: AKTUELLE_SAISON,
+			erfolgreich: ergebnis.erfolgreich,
+			neu: ergebnis.neu,
+			geaendert: ergebnis.geaendert,
+			unveraendert: ergebnis.unveraendert,
+			uebersprungen: ergebnis.uebersprungenManuell,
+			hinweise: ergebnis.hinweise.length > 0 ? ergebnis.hinweise.join('\n') : null
+		});
+		await db
+			.delete(syncLaeufe)
+			.where(
+				lt(
+					syncLaeufe.gestartetAm,
+					sql`now() - make_interval(days => ${PROTOKOLL_AUFBEWAHRUNG_TAGE})`
+				)
+			);
+	} catch (e) {
+		console.error('Sync-Protokoll konnte nicht geschrieben werden:', e);
+		ergebnis.hinweise.push(`Protokoll konnte nicht gespeichert werden: ${fehlerText(e)}`);
+		ergebnis.erfolgreich = false;
 	}
 
 	return ergebnis;

@@ -27,6 +27,8 @@
 			<SpielplanSyncKarte
 				ergebnis={form?.sync ?? null}
 				terminierungsStichtag={data.terminierungsStichtag}
+				letzterSync={data.letzterSync}
+				saison={data.syncSaison}
 			/>
 
 			<!-- Ausstehende Freischaltungen (nur für Admin/Vorstand) -->

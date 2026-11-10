@@ -7,6 +7,8 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 // entsteht erst clientseitig aus dem URL-Fragment.
 const PUBLIC_ROUTES = ['/login', '/registrieren', '/passwort-aendern'];
 const WARTE_ROUTE = '/warten';
+// Cron-Endpoint: ohne Login erreichbar, schützt sich selbst per Bearer-Token (CRON_SECRET).
+const CRON_ROUTE = '/api/cron/spielplan-sync';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
@@ -34,13 +36,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const { user } = await event.locals.safeGetSession();
 	const path = event.url.pathname;
+	const ohneLogin = PUBLIC_ROUTES.includes(path) || path === CRON_ROUTE;
 
 	if (!user) {
-		if (!PUBLIC_ROUTES.includes(path)) {
+		if (!ohneLogin) {
 			redirect(303, '/login');
 		}
 	} else {
-		if (!PUBLIC_ROUTES.includes(path) && path !== WARTE_ROUTE) {
+		if (!ohneLogin && path !== WARTE_ROUTE) {
 			const { db } = await import('$lib/server/db');
 			const { mitglieder } = await import('$lib/server/db/schema');
 			const { eq } = await import('drizzle-orm');

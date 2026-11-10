@@ -11,6 +11,7 @@ import {
 	text,
 	date,
 	time,
+	integer,
 	timestamp,
 	boolean,
 	index,
@@ -236,6 +237,25 @@ export const benachrichtigungEinstellungen = pgTable(
 		pk: primaryKey({ columns: [table.mitgliedId, table.typ] })
 	})
 );
+
+/**
+ * Protokoll der Spielplan-Syncs (täglicher Cron und Button in /verwaltung).
+ * Nur Abbild der manuell angelegten DB-Tabelle: der CHECK auf `quelle` und der
+ * Index sync_laeufe_gestartet_am_idx existieren nur in der Datenbank.
+ */
+export const syncLaeufe = pgTable('sync_laeufe', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	gestartetAm: timestamp('gestartet_am', { withTimezone: true }).notNull().defaultNow(),
+	quelle: text('quelle', { enum: ['cron', 'manuell'] }).notNull(),
+	saison: integer('saison').notNull(),
+	erfolgreich: boolean('erfolgreich').notNull(),
+	neu: integer('neu').notNull().default(0),
+	geaendert: integer('geaendert').notNull().default(0),
+	unveraendert: integer('unveraendert').notNull().default(0),
+	uebersprungen: integer('uebersprungen').notNull().default(0),
+	// Zeilenweise zusammengefügte Hinweise des Laufs; null = keine
+	hinweise: text('hinweise')
+});
 
 // --- Relations: ermöglichen komfortable Queries mit db.query.x.findMany({ with: {...} }) ---
 

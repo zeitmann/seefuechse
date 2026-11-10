@@ -19,6 +19,20 @@ const kurzDatumFormat = new Intl.DateTimeFormat('de-DE', {
 	month: '2-digit'
 });
 
+const zeitpunktFormat = new Intl.DateTimeFormat('de-DE', {
+	timeZone: ZEITZONE,
+	day: '2-digit',
+	month: '2-digit',
+	year: 'numeric',
+	hour: '2-digit',
+	minute: '2-digit'
+});
+
+/** Zeitpunkt in deutscher Zeit als 'TT.MM.JJJJ, HH:MM Uhr'. */
+export function formatiereZeitpunkt(datum: Date | string): string {
+	return `${zeitpunktFormat.format(typeof datum === 'string' ? new Date(datum) : datum)} Uhr`;
+}
+
 /** Kalendertag in Berlin als 'JJJJ-MM-TT'. */
 function berlinerTag(datum: Date): string {
 	return tagFormat.format(datum);
