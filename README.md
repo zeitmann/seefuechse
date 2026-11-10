@@ -171,7 +171,7 @@ Mockups dazu liegen unter `mockups/`.
 - **Verwaltung** (`/verwaltung`) – für Admin/Vorstand: Freischaltung wartender Mitglieder, Spielplan-Sync (Button, letzter Lauf, Stichtag bestätigter Anstoßzeiten), Links zu Spielplan- und Rollenverwaltung; die Dauerkarten-Zuordnung ist noch Platzhaltertext
 - **Verwaltung → Spielplan** (`/verwaltung/spielplan`) – Spiele anlegen, bearbeiten, löschen; Erkennung ähnlicher Vereinsnamen
 - **Verwaltung → Rollen verwalten** (`/verwaltung/rollen`) – nur Admin: Rolle zuweisen, Name/E-Mail ändern, Passwort-Mail senden
-- **Login, Registrieren, Warten** (`/login`, `/registrieren`, `/warten`) – Auth-Seiten; `/warten` sehen Mitglieder mit Status `ausstehend`
+- **Login, Registrieren, Warten** (`/login`, `/registrieren`, `/warten`) – Auth-Seiten; `/warten` sehen Mitglieder mit Status `ausstehend`. Bei der Registrierung kann „Ich habe eine Dauerkarte" angehakt werden; dann wird automatisch eine Karte mit `besitzer_id = user.id` und `bezeichnung` „DK {Name}" angelegt, die der Vorstand in der Verwaltung kontrolliert
 - **Passwort vergessen** (`/passwort-vergessen` → Mail → `/auth/callback?next=/passwort-neu` → `/passwort-neu`) – Reset-Link anfordern (neutrale Antwort), Callback tauscht `code` bzw. `token_hash` gegen eine Session, danach neues Passwort setzen
 - **Cron-Endpoint** (`POST /api/cron/spielplan-sync`) – kein Seitenaufruf, wird von der Netlify Scheduled Function per Token aufgerufen
 

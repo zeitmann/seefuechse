@@ -90,6 +90,14 @@
 					/>
 				</div>
 
+				<div class="field-checkbox">
+					<label class="checkbox-label" for="hatDauerkarte">
+						<input id="hatDauerkarte" name="hatDauerkarte" type="checkbox" />
+						<span>Ich habe eine Dauerkarte</span>
+					</label>
+					<p class="hilfe-text">Der Vorstand prüft deine Angabe.</p>
+				</div>
+
 				<button type="submit" class="btn-primary" disabled={laden}>
 					{laden ? 'Registrieren…' : 'Registrieren'}
 				</button>
@@ -165,6 +173,48 @@
 	}
 
 	input::placeholder {
+		color: var(--color-text-muted);
+	}
+
+	.field-checkbox {
+		margin-bottom: 16px;
+	}
+
+	/* Ganze Zeile klickbar, mindestens 44px hoch (Touch-Fläche) */
+	.checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-height: 44px;
+		padding: 10px 14px;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		color: var(--color-text);
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: border-color 0.15s;
+	}
+
+	.checkbox-label:has(input:checked),
+	.checkbox-label:focus-within {
+		border-color: var(--color-accent);
+	}
+
+	.checkbox-label input {
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+		margin: 0;
+		padding: 0;
+		accent-color: var(--color-accent);
+		cursor: pointer;
+	}
+
+	.hilfe-text {
+		margin: 6px 0 0;
+		font-size: 13px;
 		color: var(--color-text-muted);
 	}
 

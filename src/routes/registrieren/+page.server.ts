@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { mitglieder } from '$lib/server/db/schema';
+import { dauerkarten, mitglieder } from '$lib/server/db/schema';
 import type { Actions } from './$types';
 
 export const actions: Actions = {
@@ -10,6 +10,7 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '').trim();
 		const passwort = String(form.get('passwort') ?? '');
 		const passwortWdh = String(form.get('passwort_wdh') ?? '');
+		const hatDauerkarte = form.get('hatDauerkarte') === 'on';
 
 		if (!name || !email || !passwort) {
 			return fail(400, { fehler: 'Bitte alle Felder ausfüllen.' });
@@ -27,12 +28,31 @@ export const actions: Actions = {
 			return fail(400, { fehler: error?.message ?? 'Registrierung fehlgeschlagen.' });
 		}
 
-		await db.insert(mitglieder).values({
-			id: data.user.id,
-			name,
-			email,
-			status: 'ausstehend'
-		});
+		const userId = data.user.id;
+
+		// Mitglied und (optional) Dauerkarte gemeinsam anlegen: entweder beides
+		// oder nichts. Der Auth-User bleibt bei einem Fehler bestehen.
+		try {
+			await db.transaction(async (tx) => {
+				await tx.insert(mitglieder).values({
+					id: userId,
+					name,
+					email,
+					status: 'ausstehend'
+				});
+
+				// Selbstauskunft – der Vorstand prüft sie in der Verwaltung.
+				if (hatDauerkarte) {
+					await tx.insert(dauerkarten).values({
+						besitzerId: userId,
+						bezeichnung: `DK ${name}`
+					});
+				}
+			});
+		} catch (e) {
+			console.error('Registrierung: Anlegen von Mitglied/Dauerkarte fehlgeschlagen', e);
+			return fail(500, { fehler: 'Registrierung fehlgeschlagen.' });
+		}
 
 		return { erfolg: true };
 	}
