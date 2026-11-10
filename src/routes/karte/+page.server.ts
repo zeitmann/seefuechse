@@ -1,9 +1,11 @@
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { dauerkarten, spiele as spieleTable, freigaben, interesse } from '$lib/server/db/schema';
-import { eq, gte, asc, count, inArray } from 'drizzle-orm';
+import { eq, asc, count, inArray } from 'drizzle-orm';
 import { toggleFreigabe, vergebenAn } from '$lib/server/freigaben';
 import { alsAktionsFehler } from '$lib/server/aktionen';
+import { istSpielOffen } from '$lib/server/spielStatus';
+import { heuteDatum } from '$lib/spielAnzeige';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -21,13 +23,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 		return { hasDauerkarte: false as const };
 	}
 
-	const heute = new Date().toISOString().slice(0, 10);
+	const heute = heuteDatum();
 
-	const kommendeSpiele = await db.query.spiele.findMany({
-		where: gte(spieleTable.datum, heute),
-		// Nach Datum, dann Anpfiff; Postgres sortiert NULL bei ASC zuletzt (ohne Uhrzeit hinten).
-		orderBy: [asc(spieleTable.datum), asc(spieleTable.uhrzeit)]
-	});
+	// Nur offene Spiele (ab heute in Berlin und ohne Ergebnis) – gefiltert mit der
+	// gemeinsamen Regel aus spielStatus.ts, damit sie nur an einer Stelle steht.
+	// Die Saison hat wenige Dutzend Spiele, daher Filtern nach dem Laden.
+	const kommendeSpiele = (
+		await db.query.spiele.findMany({
+			// Nach Datum, dann Anpfiff; Postgres sortiert NULL bei ASC zuletzt (ohne Uhrzeit hinten).
+			orderBy: [asc(spieleTable.datum), asc(spieleTable.uhrzeit)]
+		})
+	).filter((spiel) => istSpielOffen(spiel, heute));
 
 	const meineFreigaben = await db.query.freigaben.findMany({
 		where: eq(freigaben.dauerkarteId, eigenesDauerkarte.id),
@@ -54,7 +60,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		return { spiel, freigabe, interesseAnzahl: interesseProSpiel.get(spiel.id) ?? 0 };
 	});
 
-	const freigegebenCount = meineFreigaben.filter((f) => f.status === 'offen').length;
+	// Zählt nur offene Freigaben zu offenen Spielen (wie die Liste darunter).
+	const freigegebenCount = spieleMitFreigabe.filter((s) => s.freigabe?.status === 'offen').length;
 
 	return {
 		hasDauerkarte: true as const,
@@ -73,7 +80,12 @@ export const actions: Actions = {
 		const spielId = String(form.get('spielId') ?? '');
 		if (!spielId) error(400, 'Fehlende Spiel-ID');
 
-		await toggleFreigabe(user.id, spielId);
+		try {
+			await toggleFreigabe(user.id, spielId);
+		} catch (e) {
+			// z. B. 409 "Dieses Spiel hat bereits stattgefunden."
+			return alsAktionsFehler(e);
+		}
 	},
 
 	vergeben: async ({ request, locals }) => {

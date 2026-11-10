@@ -156,7 +156,7 @@ Wichtig: Der „DK-Besitzer" ist keine eigene Rolle, sondern ergibt sich aus der
 
 ## Offene und gesperrte Spiele
 
-Ein Spiel ist **offen**, solange `datum >= heute` (Europe/Berlin) und noch kein Endergebnis eingetragen ist (`tore_heimteam IS NULL`); ein Spiel von heute bleibt also bis zum Ergebnis offen. Sonst ist es **gesperrt**: Freigeben, Interesse anmelden, Bewerben und Vergeben (auch nachträglich) lehnen die Server-Actions mit „Dieses Spiel hat bereits stattgefunden.“ (409) ab, ohne Datenänderung und ohne Benachrichtigung. **Zurückziehen** (Freigabe, Interesse, Bewerbung) bleibt immer erlaubt, damit sich alte Einträge aufräumen lassen. Die Regel steht an einer Stelle: `src/lib/server/spielStatus.ts`.
+Ein Spiel ist **offen**, solange `datum >= heute` (Europe/Berlin) und noch kein Endergebnis eingetragen ist (`tore_heimteam IS NULL`); ein Spiel von heute bleibt also bis zum Ergebnis offen. Sonst ist es **gesperrt**: Freigeben, Interesse anmelden, Bewerben und Vergeben (auch nachträglich) lehnen die Server-Actions mit „Dieses Spiel hat bereits stattgefunden.“ (409) ab, ohne Datenänderung und ohne Benachrichtigung. **Zurückziehen** (Freigabe, Interesse, Bewerbung) bleibt immer erlaubt, damit sich alte Einträge aufräumen lassen. Die Regel steht an einer Stelle: `src/lib/server/spielStatus.ts`. Die Detailseite zeigt bei gesperrten Spielen nur noch das Zurückziehen; `/karte`, `/anfragen` und das Dashboard (freie Karten, eigene offene Freigaben) listen nur noch offene Spiele. Abgelehnte Aktionen erscheinen als Fehlermeldung auf der Seite, nicht als Fehlerseite.
 
 ## Rollensystem
 
@@ -310,7 +310,6 @@ Größere Implementierungsschritte werden häufig als strukturierter Prompt für
 - **Web-Push:** Tabellen `push_abos` und `benachrichtigung_einstellungen` existieren, Versand (`benachrichtigen()`) und Service-Worker-Handler sind noch nicht umgesetzt.
 - **Benachrichtigung bei Terminänderungen:** Der Sync liefert verschobene Termine (`terminAenderungen`), daraus werden noch keine Benachrichtigungen erzeugt.
 - **`manuell_ueberschrieben` zurücksetzen** geht nur per SQL, es gibt keinen Button.
-- **Gesperrte Spiele in `/karte`, `/anfragen` und Dashboard:** Die Server-Actions lehnen gesperrte Spiele bereits ab, die Bedienelemente dieser Seiten blenden sie aber noch nicht aus.
 - **Mehrfach-Dauerkarten pro Besitzer:** `/karte`, `/spielplan/[id]` und das Dashboard berücksichtigen nur die erste gefundene Karte einer Person.
 - **Saisonwechsel 2027/28:** `AKTUELLE_SAISON` und Liga-Kürzel anpassen.
 - **Spielplan-UI:** Badges für Heim/Auswärts und Wettbewerb haben je eine einheitliche Farbe (Wettbewerbe nicht unterschieden).

@@ -70,7 +70,7 @@
 		<section class="section">
 			<h2 class="section-title">Deine Bewerbungen</h2>
 			{#if data.meineBewerbungen.length === 0}
-				<p class="empty-state">Du hast dich noch auf keine Freigabe beworben.</p>
+				<p class="empty-state">Du hast dich auf keine Freigabe für ein kommendes Spiel beworben.</p>
 			{:else}
 				<div class="liste">
 					{#each data.meineBewerbungen as bewerbung (bewerbung.id)}

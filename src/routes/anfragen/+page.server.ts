@@ -6,6 +6,8 @@ import { vergebenAn } from '$lib/server/freigaben';
 import { interesseZurueckziehen } from '$lib/server/interesse';
 import { bewerbungZurueckziehen } from '$lib/server/bewerbungen';
 import { alsAktionsFehler } from '$lib/server/aktionen';
+import { istSpielOffen } from '$lib/server/spielStatus';
+import { heuteDatum } from '$lib/spielAnzeige';
 import type { PageServerLoad, Actions } from './$types';
 
 type MeinInteresse = {
@@ -49,15 +51,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const { user } = await locals.safeGetSession();
 	if (!user) return leer;
 
-	const heute = new Date().toISOString().slice(0, 10);
+	// Alle drei Listen zeigen nur Einträge zu offenen Spielen (ab heute in Berlin
+	// und ohne Ergebnis, gemeinsame Regel aus spielStatus.ts).
+	const heute = heuteDatum();
 
-	// 1. Eigene Interesse-Anmeldungen – nur kommende Spiele, nach Datum aufsteigend.
+	// 1. Eigene Interesse-Anmeldungen – nur offene Spiele, nach Datum aufsteigend.
 	const meineInteressenRaw = await db.query.interesse.findMany({
 		where: eq(interesse.mitgliedId, user.id),
 		with: { spiel: true }
 	});
 	const meineInteressen: MeinInteresse[] = meineInteressenRaw
-		.filter((i) => i.spiel.datum >= heute)
+		.filter((i) => istSpielOffen(i.spiel, heute))
 		.sort((a, b) => a.spiel.datum.localeCompare(b.spiel.datum))
 		.map((i) => ({
 			spielId: i.spielId,
@@ -66,7 +70,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			wettbewerb: i.spiel.wettbewerb
 		}));
 
-	// 2. Eigene Bewerbungen – mit Spiel- und Kartenbesitzer-Infos, nach Datum.
+	// 2. Eigene Bewerbungen zu offenen Spielen – mit Spiel- und Kartenbesitzer-Infos, nach Datum.
 	const meineBewerbungenRaw = await db.query.bewerbungen.findMany({
 		where: eq(bewerbungen.mitgliedId, user.id),
 		with: {
@@ -79,6 +83,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	});
 	const meineBewerbungen: MeineBewerbung[] = meineBewerbungenRaw
+		.filter((b) => istSpielOffen(b.freigabe.spiel, heute))
 		.sort((a, b) => a.freigabe.spiel.datum.localeCompare(b.freigabe.spiel.datum))
 		.map((b) => ({
 			id: b.id,
@@ -90,8 +95,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			besitzerName: b.freigabe.dauerkarte.besitzer.name
 		}));
 
-	// 3. Eigene offene Freigaben mit Bewerberliste – nur wenn der Nutzer
-	//    mindestens eine Dauerkarte besitzt.
+	// 3. Eigene offene Freigaben zu offenen Spielen mit Bewerberliste – nur wenn
+	//    der Nutzer mindestens eine Dauerkarte besitzt.
 	const eigeneDauerkarten = await db.query.dauerkarten.findMany({
 		where: eq(dauerkarten.besitzerId, user.id)
 	});
@@ -114,6 +119,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 		});
 		eigeneOffeneFreigaben = raw
+			.filter((f) => istSpielOffen(f.spiel, heute))
 			.sort((a, b) => a.spiel.datum.localeCompare(b.spiel.datum))
 			.map((f) => ({
 				id: f.id,

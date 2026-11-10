@@ -2,6 +2,7 @@ import { db } from '$lib/server/db';
 import { mitglieder, spiele, freigaben } from '$lib/server/db/schema';
 import { and, eq, gte, asc, isNull } from 'drizzle-orm';
 import { heuteDatum } from '$lib/spielAnzeige';
+import { istSpielOffen } from '$lib/server/spielStatus';
 import {
 	ermittleTerminierungsStichtag,
 	mitUhrzeitVorlaeufig
@@ -44,14 +45,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 		ermittleTerminierungsStichtag()
 	]);
 
-	const offeneFreigaben = await db.query.freigaben.findMany({
-		where: eq(freigaben.status, 'offen'),
-		with: {
-			dauerkarte: { with: { besitzer: true } },
-			spiel: true,
-			bewerbungen: { with: { mitglied: true } }
-		}
-	});
+	// Offene Freigaben nur zu offenen Spielen (gemeinsame Regel aus spielStatus.ts);
+	// darauf bauen freeCount, "meine offenen Freigaben" und "Aktuell freie Karten" auf.
+	const offeneFreigaben = (
+		await db.query.freigaben.findMany({
+			where: eq(freigaben.status, 'offen'),
+			with: {
+				dauerkarte: { with: { besitzer: true } },
+				spiel: true,
+				bewerbungen: { with: { mitglied: true } }
+			}
+		})
+	).filter((f) => istSpielOffen(f.spiel, heute));
 
 	const naechsteSpiele = mitUhrzeitVorlaeufig(naechsteSpieleRaw, stichtag).map((spiel) => ({
 		...spiel,
