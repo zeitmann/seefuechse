@@ -11,6 +11,8 @@ import {
 	text,
 	date,
 	timestamp,
+	boolean,
+	index,
 	primaryKey,
 	unique
 } from 'drizzle-orm/pg-core';
@@ -38,6 +40,17 @@ export const bewerbungStatusEnum = pgEnum('bewerbung_status', [
 	'angenommen',
 	'abgelehnt'
 ]);
+
+export const benachrichtigungTypEnum = pgEnum('benachrichtigung_typ', [
+	'neue_anfrage',
+	'anfrage_angenommen',
+	'anfrage_abgelehnt',
+	'karte_freigegeben',
+	'neues_interesse'
+]);
+
+/** Mögliche Werte von benachrichtigung_typ, z. B. 'neue_anfrage'. */
+export type BenachrichtigungTyp = (typeof benachrichtigungTypEnum.enumValues)[number];
 
 export const rollen = pgTable('rollen', {
 	id: uuid('id').defaultRandom().primaryKey(),
@@ -145,13 +158,82 @@ export const interesse = pgTable(
 	})
 );
 
+/**
+ * In-App-Benachrichtigungen (Glocke). Push-Versand baut später darauf auf.
+ */
+export const benachrichtigungen = pgTable(
+	'benachrichtigungen',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		mitgliedId: uuid('mitglied_id')
+			.notNull()
+			.references(() => mitglieder.id, { onDelete: 'cascade' }),
+		typ: benachrichtigungTypEnum('typ').notNull(),
+		titel: text('titel').notNull(),
+		text: text('text').notNull(),
+		link: text('link').notNull(),
+		// NULL = ungelesen
+		gelesenAm: timestamp('gelesen_am', { withTimezone: true }),
+		erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow()
+	},
+	(table) => ({
+		mitgliedErstelltIdx: index('benachrichtigungen_mitglied_erstellt_idx').on(
+			table.mitgliedId,
+			table.erstelltAm.desc()
+		)
+	})
+);
+
+/**
+ * Web-Push-Abos (ein Eintrag pro Gerät/Browser). endpoint ist eindeutig.
+ */
+export const pushAbos = pgTable(
+	'push_abos',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		mitgliedId: uuid('mitglied_id')
+			.notNull()
+			.references(() => mitglieder.id, { onDelete: 'cascade' }),
+		endpoint: text('endpoint').notNull().unique(),
+		p256dh: text('p256dh').notNull(),
+		auth: text('auth').notNull(),
+		// Optionale Gerätebeschreibung, z. B. aus dem User-Agent
+		geraet: text('geraet'),
+		erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow()
+	},
+	(table) => ({
+		mitgliedIdx: index('push_abos_mitglied_idx').on(table.mitgliedId)
+	})
+);
+
+/**
+ * Push-Einstellung pro Mitglied und Typ. Fehlt eine Zeile, gilt der
+ * Standardwert (push_aktiv = true).
+ */
+export const benachrichtigungEinstellungen = pgTable(
+	'benachrichtigung_einstellungen',
+	{
+		mitgliedId: uuid('mitglied_id')
+			.notNull()
+			.references(() => mitglieder.id, { onDelete: 'cascade' }),
+		typ: benachrichtigungTypEnum('typ').notNull(),
+		pushAktiv: boolean('push_aktiv').notNull().default(true)
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.mitgliedId, table.typ] })
+	})
+);
+
 // --- Relations: ermöglichen komfortable Queries mit db.query.x.findMany({ with: {...} }) ---
 
 export const mitgliederRelations = relations(mitglieder, ({ many }) => ({
 	rollenZuordnungen: many(mitgliedRollen),
 	dauerkarten: many(dauerkarten),
 	bewerbungen: many(bewerbungen),
-	interesse: many(interesse)
+	interesse: many(interesse),
+	benachrichtigungen: many(benachrichtigungen),
+	pushAbos: many(pushAbos),
+	benachrichtigungEinstellungen: many(benachrichtigungEinstellungen)
 }));
 
 export const rollenRelations = relations(rollen, ({ many }) => ({
@@ -219,3 +301,27 @@ export const interesseRelations = relations(interesse, ({ one }) => ({
 		references: [spiele.id]
 	})
 }));
+
+export const benachrichtigungenRelations = relations(benachrichtigungen, ({ one }) => ({
+	mitglied: one(mitglieder, {
+		fields: [benachrichtigungen.mitgliedId],
+		references: [mitglieder.id]
+	})
+}));
+
+export const pushAbosRelations = relations(pushAbos, ({ one }) => ({
+	mitglied: one(mitglieder, {
+		fields: [pushAbos.mitgliedId],
+		references: [mitglieder.id]
+	})
+}));
+
+export const benachrichtigungEinstellungenRelations = relations(
+	benachrichtigungEinstellungen,
+	({ one }) => ({
+		mitglied: one(mitglieder, {
+			fields: [benachrichtigungEinstellungen.mitgliedId],
+			references: [mitglieder.id]
+		})
+	})
+);
