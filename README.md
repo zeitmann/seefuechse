@@ -10,6 +10,7 @@
 - [Kernfunktion](#kernfunktion)
 - [Tech-Stack](#tech-stack)
 - [Datenbankstruktur](#datenbankstruktur)
+- [Offene und gesperrte Spiele](#offene-und-gesperrte-spiele)
 - [Rollensystem](#rollensystem)
 - [Seiten-Übersicht](#seiten-übersicht)
 - [Implementierungsstand](#implementierungsstand)
@@ -153,6 +154,10 @@ Wichtig: Der „DK-Besitzer" ist keine eigene Rolle, sondern ergibt sich aus der
 
 **Schema-Änderungen** werden manuell im Supabase SQL Editor angewendet, `schema.ts` wird von Hand nachgezogen. Kein `drizzle-kit push` ausführen: Der UNIQUE-Index auf `spiele.openligadb_id` existiert nur in der Datenbank und würde entfernt.
 
+## Offene und gesperrte Spiele
+
+Ein Spiel ist **offen**, solange `datum >= heute` (Europe/Berlin) und noch kein Endergebnis eingetragen ist (`tore_heimteam IS NULL`); ein Spiel von heute bleibt also bis zum Ergebnis offen. Sonst ist es **gesperrt**: Freigeben, Interesse anmelden, Bewerben und Vergeben (auch nachträglich) lehnen die Server-Actions mit „Dieses Spiel hat bereits stattgefunden.“ (409) ab, ohne Datenänderung und ohne Benachrichtigung. **Zurückziehen** (Freigabe, Interesse, Bewerbung) bleibt immer erlaubt, damit sich alte Einträge aufräumen lassen. Die Regel steht an einer Stelle: `src/lib/server/spielStatus.ts`.
+
 ## Rollensystem
 
 Drei Rollen: Admin, Vorstand, Mitglied. Sie sind many-to-many über `mitglied_rollen` verknüpft. Vorstand hat den gleichen Funktionsumfang wie Admin, mit einer Ausnahme: die Seite „Rollen verwalten" ist ausschließlich Admins vorbehalten.
@@ -167,7 +172,7 @@ Mockups dazu liegen unter `mockups/`.
 
 - **Start** (`/`) – Dashboard mit Begrüßung, offenen Bewerbungen auf die eigene Karte (falls DK-Besitzer), den nächsten Spielen und allen aktuell club-weit freigegebenen Karten
 - **Spielplan** (`/spielplan`) – alle Spiele der Saison, Tabs Kommende/Vergangene, Filter Liga/Pokal/Europa/Testspiele, zeigt freie Karten je Spiel und kennzeichnet vorläufige Anstoßzeiten; jede Spielkachel verlinkt zur Detailseite. Die Kachel zeigt links groß Spieltag bzw. Runde (z. B. „3 Spieltag", „Achtelfinale"; ohne Runde das Datum), daneben Datum und Uhrzeit, und bei beendeten Spielen rechts das Ergebnis in Stadion-Reihenfolge (Heim : Gast). „Vergangene" enthält Spiele vor heute (Europe/Berlin) oder mit Endergebnis, „Kommende" den Rest
-- **Spieldetail** (`/spielplan/[id]`) – ein einzelnes Spiel: eigene Karte freigeben/zurückziehen, Bewerbungen entscheiden, an Interessenten direkt vergeben; Mitglieder können sich bewerben oder Interesse anmelden/zurückziehen
+- **Spieldetail** (`/spielplan/[id]`) – ein einzelnes Spiel: eigene Karte freigeben/zurückziehen, Bewerbungen entscheiden, an Interessenten direkt vergeben; Mitglieder können sich bewerben oder Interesse anmelden/zurückziehen. Bei gespielten Spielen zeigt die Seite den Hinweis „Dieses Spiel hat bereits stattgefunden.“ und nur noch das Zurückziehen eigener Einträge
 - **Meine Dauerkarte** (`/karte`) – nur für DK-Besitzer: eigene Dauerkarte je kommendem Spiel freigeben/behalten, Bewerbungen einsehen und vergeben, Anzahl Interessenten je Spiel
 - **Anfragen** (`/anfragen`) – für alle Mitglieder: eigene Interesse-Anmeldungen und Bewerbungen (zurückziehbar), für DK-Besitzer zusätzlich eigene offene Freigaben mit Bewerberliste
 - **Benachrichtigungen** (`/benachrichtigungen`) – letzte 50 Benachrichtigungen, einzeln öffnen (markiert als gelesen) oder alle als gelesen markieren; erreichbar über die Glocke im Header mit Ungelesen-Zähler
@@ -305,6 +310,7 @@ Größere Implementierungsschritte werden häufig als strukturierter Prompt für
 - **Web-Push:** Tabellen `push_abos` und `benachrichtigung_einstellungen` existieren, Versand (`benachrichtigen()`) und Service-Worker-Handler sind noch nicht umgesetzt.
 - **Benachrichtigung bei Terminänderungen:** Der Sync liefert verschobene Termine (`terminAenderungen`), daraus werden noch keine Benachrichtigungen erzeugt.
 - **`manuell_ueberschrieben` zurücksetzen** geht nur per SQL, es gibt keinen Button.
+- **Gesperrte Spiele in `/karte`, `/anfragen` und Dashboard:** Die Server-Actions lehnen gesperrte Spiele bereits ab, die Bedienelemente dieser Seiten blenden sie aber noch nicht aus.
 - **Mehrfach-Dauerkarten pro Besitzer:** `/karte`, `/spielplan/[id]` und das Dashboard berücksichtigen nur die erste gefundene Karte einer Person.
 - **Saisonwechsel 2027/28:** `AKTUELLE_SAISON` und Liga-Kürzel anpassen.
 - **Spielplan-UI:** Badges für Heim/Auswärts und Wettbewerb haben je eine einheitliche Farbe (Wettbewerbe nicht unterschieden).

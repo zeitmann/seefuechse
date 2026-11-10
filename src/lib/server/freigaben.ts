@@ -8,7 +8,12 @@ import {
 	mitglieder,
 	spiele
 } from '$lib/server/db/schema';
-import { eq, and, ne, inArray } from 'drizzle-orm';
+import { eq, and, ne, inArray, sql } from 'drizzle-orm';
+import {
+	spielOffenBedingung,
+	spielOffenSperren,
+	wennGesperrtFehler
+} from '$lib/server/spielStatus';
 import {
 	benachrichtigenOhneFehler,
 	kuerzlichBenachrichtigt,
@@ -30,18 +35,39 @@ export async function toggleFreigabe(userId: string, spielId: string): Promise<v
 	// Nur wenn die Freigabe danach 'offen' ist, wird benachrichtigt.
 	let jetztOffen = false;
 
+	// Freigeben (neu oder erneut) nur bei offenem Spiel – geprüft atomar im
+	// selben Statement (spielOffenBedingung). Zurückziehen bleibt immer erlaubt.
 	if (!vorhandeneFreigabe) {
-		await db.insert(freigaben).values({
-			dauerkarteId: eigenesDauerkarte.id,
-			spielId,
-			status: 'offen'
-		});
+		// INSERT … SELECT … WHERE EXISTS: legt nur an, solange das Spiel offen ist.
+		// postgres-js liefert die returning-Zeilen als Array.
+		const angelegt = await db.execute(sql`
+			insert into ${freigaben} ("dauerkarte_id", "spiel_id", "status")
+			select ${eigenesDauerkarte.id}::uuid, ${spielId}::uuid, 'offen'::freigabe_status
+			where ${spielOffenBedingung(spielId)}
+			returning id
+		`);
+		if (angelegt.length === 0) {
+			await wennGesperrtFehler(spielId);
+			return;
+		}
 		jetztOffen = true;
 	} else if (vorhandeneFreigabe.status === 'zurueckgezogen') {
-		await db
+		const wiederOffen = await db
 			.update(freigaben)
 			.set({ status: 'offen' })
-			.where(eq(freigaben.id, vorhandeneFreigabe.id));
+			.where(
+				and(
+					eq(freigaben.id, vorhandeneFreigabe.id),
+					eq(freigaben.status, 'zurueckgezogen'),
+					spielOffenBedingung(freigaben.spielId)
+				)
+			)
+			.returning({ id: freigaben.id });
+		if (wiederOffen.length === 0) {
+			// Gesperrt → 409; sonst zwischenzeitlich geändert (Race) → No-Op.
+			await wennGesperrtFehler(spielId);
+			return;
+		}
 		jetztOffen = true;
 	} else if (vorhandeneFreigabe.status === 'offen') {
 		await db
@@ -241,11 +267,18 @@ export async function vergebenAn(
 	if (freigabe.status !== 'offen') return;
 
 	const abgelehnteIds = await db.transaction(async (tx) => {
-		// Bedingtes UPDATE als Race-Schutz: nur wenn die Freigabe noch 'offen' ist.
+		// Bedingtes UPDATE als Race-Schutz: nur wenn die Freigabe noch 'offen' ist
+		// und das Spiel noch nicht stattgefunden hat (kein nachträgliches Vergeben).
 		const [vergeben] = await tx
 			.update(freigaben)
 			.set({ status: 'vergeben', vergebenAn: mitgliedId })
-			.where(and(eq(freigaben.id, freigabeId), eq(freigaben.status, 'offen')))
+			.where(
+				and(
+					eq(freigaben.id, freigabeId),
+					eq(freigaben.status, 'offen'),
+					spielOffenBedingung(freigaben.spielId)
+				)
+			)
 			.returning({ spielId: freigaben.spielId });
 
 		// Zwischenzeitlich anderweitig vergeben/zurückgezogen → nichts weiter tun.
@@ -258,8 +291,12 @@ export async function vergebenAn(
 		return abgelehnt;
 	});
 
-	// Keine Vergabe (Race) → keine Benachrichtigung. Sonst erst nach dem Commit.
-	if (!abgelehnteIds) return;
+	// Keine Vergabe → keine Benachrichtigung: gesperrtes Spiel → 409, sonst Race
+	// (zwischenzeitlich vergeben/zurückgezogen) → No-Op. Sonst erst nach dem Commit.
+	if (!abgelehnteIds) {
+		await wennGesperrtFehler(freigabe.spielId);
+		return;
+	}
 	await nachVergabeBenachrichtigen(userId, freigabe.spiel, mitgliedId, abgelehnteIds);
 }
 
@@ -283,6 +320,10 @@ export async function vergebenAnMitInteresse(
 	}
 
 	const vergabe = await db.transaction(async (tx) => {
+		// Spiel muss offen sein; die Zeilensperre (FOR SHARE) hält das bis zum
+		// Commit fest, weil hier mehrere Schreibschritte folgen.
+		await spielOffenSperren(tx, spielId);
+
 		// 2. Freigabe für (dauerkarteId, spielId) finden bzw. anlegen.
 		const vorhandeneFreigabe = await tx.query.freigaben.findFirst({
 			where: and(eq(freigaben.dauerkarteId, dauerkarteId), eq(freigaben.spielId, spielId))

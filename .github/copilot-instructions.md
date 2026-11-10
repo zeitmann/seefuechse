@@ -61,6 +61,8 @@ Tabellen: `mitglieder` (id = FK auf `auth.users.id`), `rollen`, `mitglied_rollen
 
 Drei Rollen (Admin, Vorstand, Mitglied), many-to-many über `mitglied_rollen`. Vorstand hat den gleichen Umfang wie Admin, außer „Rollen verwalten" (nur Admin). Die Prüfung läuft über `hatVerwaltungsRolle(userId)`, im `load()` und zusätzlich in jeder Action. `hooks.server.ts` enthält Auth-Session und Routen-Schutz; der Cron-Pfad `/api/cron/spielplan-sync` ist davon ausgenommen und über ein Token geschützt.
 
+**Gesperrte Spiele:** Offen = `datum >= heuteDatum()` (Europe/Berlin, `src/lib/spielAnzeige.ts`) UND `tore_heimteam IS NULL`, sonst gesperrt. Gesperrt werden Freigeben (Anlegen und Wieder-Öffnen in `toggleFreigabe`), `interesseAnmelden`, Bewerben (Action `bewerben` in `/spielplan/[id]`) sowie `vergebenAn` und `vergebenAnMitInteresse` (kein nachträgliches Vergeben). Zurückziehen (Freigabe, Interesse, Bewerbung) bleibt immer erlaubt. Einzige Stelle: `src/lib/server/spielStatus.ts` mit `istSpielOffen` (für `load()`), `spielOffenBedingung` (EXISTS-Ausdruck für bedingte Statements, atomar), `spielOffenSperren` (Vorabprüfung mit `FOR SHARE` in einer Transaktion) und `wennGesperrtFehler` (404/409 nach einem Statement ohne Treffer). Meldung `SPIEL_GESPERRT_MELDUNG` = „Dieses Spiel hat bereits stattgefunden.“, Rückgabe über `alsAktionsFehler` als `fail(409)`. `/spielplan/[id]` bekommt `spielOffen` aus dem `load()` und blendet die Bedienelemente aus; `/karte`, `/anfragen` und Dashboard noch nicht.
+
 ## 6. Spielplan-Sync
 
 Quelle ist OpenLigaDB (kostenlos, ohne Auth, Community-gepflegt), kein Webscraping.
@@ -129,7 +131,8 @@ Stand 10.11.2026, gegen den Code geprüft. Bereits fertig und daher **nicht** of
 - Dauerkarten in `/verwaltung` anlegen oder einem anderen Mitglied zuordnen (aktuell nur anzeigen und entfernen; Anlegen nur über die Registrierung).
 - Admin-UI zum Zurücksetzen von `manuell_ueberschrieben`.
 - Mehrfach-Dauerkarten pro Besitzer: `/karte` und `/spielplan/[id]` nutzen `findFirst`, das Dashboard die erste Karte.
-- Vorverkaufstermine (Heim/Auswärts) und Spielergebnisse: keine Spalten im Schema.
+- Vorverkaufstermine (Heim/Auswärts): keine Spalten im Schema.
+- Gesperrte Spiele: Bedienelemente in `/karte`, `/anfragen` und Dashboard noch nicht ausgeblendet (die Actions lehnen bereits ab); die Action `toggleFreigabe` in `/karte` fängt den 409 noch nicht per `alsAktionsFehler` ab.
 - Spielplan-UI: Badge-Farben (Auswärts neutral, Wettbewerbe farblich unterscheiden); der Filter-Chip „Testspiele" existiert.
 - Leaflet ist installiert, aber nirgends eingebunden; Teststrategie offen, keine automatisierten Tests.
 - Saisonwechsel 2027/28: `AKTUELLE_SAISON` und Liga-Kürzel anpassen.

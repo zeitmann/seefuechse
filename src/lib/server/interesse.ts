@@ -1,9 +1,10 @@
 import { db } from '$lib/server/db';
 import { dauerkarten, freigaben, interesse, mitglieder, spiele } from '$lib/server/db/schema';
-import { and, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { istUniqueViolation } from '$lib/server/db/errors';
 import { hatAktiveEigeneFreigabe } from '$lib/server/freigaben';
+import { spielOffenBedingung, wennGesperrtFehler } from '$lib/server/spielStatus';
 import {
 	benachrichtigenOhneFehler,
 	spielBezeichnung,
@@ -14,7 +15,7 @@ import {
  * Meldet Interesse eines Mitglieds für ein Spiel an (nur INSERT).
  *
  * Abgelehnt (409), wenn der Nutzer für dieses Spiel selbst eine Freigabe mit
- * Status offen/vergeben hat. Der Unique Constraint auf (mitglied_id, spiel_id)
+ * Status offen/vergeben hat oder das Spiel nicht mehr offen ist (spielStatus.ts). Der Unique Constraint auf (mitglied_id, spiel_id)
  * fängt einen zweiten INSERT durch Doppelklick/Race Condition als No-Op ab.
  *
  * Wurde wirklich ein Eintrag angelegt, werden alle Dauerkarten-Besitzer ohne
@@ -28,11 +29,17 @@ export async function interesseAnmelden(userId: string, spielId: string): Promis
 	}
 	let angelegt = false;
 	try {
-		const zeilen = await db
-			.insert(interesse)
-			.values({ mitgliedId: userId, spielId })
-			.returning({ id: interesse.id });
+		// INSERT … SELECT … WHERE EXISTS: nur bei offenem Spiel, atomar im selben
+		// Statement. postgres-js liefert die returning-Zeilen als Array.
+		const zeilen = await db.execute(sql`
+			insert into ${interesse} ("mitglied_id", "spiel_id")
+			select ${userId}::uuid, ${spielId}::uuid
+			where ${spielOffenBedingung(spielId)}
+			returning id
+		`);
 		angelegt = zeilen.length > 0;
+		// Keine Zeile ohne Unique-Verletzung → Spiel gesperrt (409) oder unbekannt (404).
+		if (!angelegt) await wennGesperrtFehler(spielId);
 	} catch (e) {
 		if (!istUniqueViolation(e)) throw e;
 	}

@@ -83,22 +83,29 @@
 			{/if}
 		</Card>
 
-		<!-- Dauerkarte-Abschnitt -->
-		{#if data.hasDauerkarte}
+		<!-- Gespieltes Spiel: nur noch lesen und eigene Einträge zurückziehen -->
+		{#if !data.spielOffen}
+			<p class="gesperrt-hinweis" role="status">Dieses Spiel hat bereits stattgefunden.</p>
+		{/if}
+
+		<!-- Dauerkarte-Abschnitt – bei gesperrtem Spiel nur, wenn es eine offene
+		     (zurückziehbare) oder vergebene (nur Anzeige) eigene Freigabe gibt -->
+		{#if data.hasDauerkarte && (data.spielOffen || data.freigabe?.status === 'offen' || data.freigabe?.status === 'vergeben')}
 			<section class="freigabe-section">
 				<h3 class="section-title">Deine Dauerkarte für dieses Spiel</h3>
 				<FreigabeZeile
 					spiel={data.spiel}
 					freigabe={data.freigabe}
 					zeigeBewerber={false}
-					toggleBeschriftung="Dauerkarte freigeben"
+					toggleBeschriftung={data.spielOffen ? 'Dauerkarte freigeben' : 'Freigabe zurückziehen'}
 				/>
 			</section>
 		{/if}
 
 		<!-- Interesse anmelden – ausgeblendet, wenn der Nutzer selbst eine Freigabe
-		     (offen/vergeben) hat; ein bestehender Eintrag bleibt zurückziehbar. -->
-		{#if !data.interesseGesperrt || data.hatInteresseAngemeldet}
+		     (offen/vergeben) hat oder das Spiel gesperrt ist; ein bestehender
+		     Eintrag bleibt zurückziehbar. -->
+		{#if data.hatInteresseAngemeldet || (data.spielOffen && !data.interesseGesperrt)}
 		<section class="freigabe-section">
 			<h3 class="section-title">Dein Interesse an diesem Spiel</h3>
 			<Card>
@@ -183,7 +190,8 @@
 								</span>
 							</div>
 
-							{#if freigabe.status === 'offen' && !freigabe.istBesitzer}
+							<!-- Bei gesperrtem Spiel nur noch die eigene Anfrage zurückziehen -->
+							{#if freigabe.status === 'offen' && !freigabe.istBesitzer && (data.spielOffen || freigabe.hatSelbstBeworben)}
 								<div class="freigabe-aktion">
 									{#if freigabe.hatSelbstBeworben}
 										<p class="anfrage-status">Angefragt ✓</p>
@@ -216,7 +224,7 @@
 												{bewerber.name}
 												<span class="bewerber-status">({bewerber.status})</span>
 											</span>
-											{#if freigabe.istBesitzer && freigabe.status === 'offen' && bewerber.status === 'angefragt'}
+											{#if data.spielOffen && freigabe.istBesitzer && freigabe.status === 'offen' && bewerber.status === 'angefragt'}
 												<form method="POST" action="?/vergeben" use:enhance={mitNeuladenBeiFehler}>
 													<input type="hidden" name="freigabeId" value={freigabe.id} />
 													<input type="hidden" name="bewerbungId" value={bewerber.id} />
@@ -398,6 +406,15 @@
 		background: var(--color-warning-muted);
 		color: var(--color-warning);
 		font-size: 12px;
+	}
+
+	.gesperrt-hinweis {
+		margin: 0;
+		padding: 8px 12px;
+		border-radius: var(--radius-md);
+		background: var(--color-info-muted);
+		color: var(--color-info);
+		font-size: 13px;
 	}
 
 	.hero-datum-long {

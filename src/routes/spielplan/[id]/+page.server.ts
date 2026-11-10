@@ -24,6 +24,7 @@ import {
 	ermittleTerminierungsStichtag,
 	istUhrzeitVorlaeufig
 } from '$lib/server/spielplanTermine';
+import { istSpielOffen, spielOffenBedingung, wennGesperrtFehler } from '$lib/server/spielStatus';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -37,6 +38,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!spielRoh) error(404, 'Spiel nicht gefunden');
 
 	const spiel = { ...spielRoh, uhrzeitVorlaeufig: istUhrzeitVorlaeufig(spielRoh, stichtag) };
+	// Gesperrt (vergangen oder mit Ergebnis) → nur noch Zurückziehen anbieten.
+	// Reine UI-Steuerung; die Actions prüfen das selbst (spielStatus.ts).
+	const spielOffen = istSpielOffen(spielRoh);
 
 	const { user } = await locals.safeGetSession();
 	const istAdmin = user ? await hatAdminRolle(user.id) : false;
@@ -109,6 +113,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!user) {
 		return {
 			spiel,
+			spielOffen,
 			hasDauerkarte: false as const,
 			freigabe: null,
 			freigabenFuerSpiel,
@@ -126,6 +131,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!eigenesDauerkarte) {
 		return {
 			spiel,
+			spielOffen,
 			hasDauerkarte: false as const,
 			freigabe: null,
 			freigabenFuerSpiel,
@@ -145,11 +151,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			}
 		})) ?? null;
 
-	// Vergeben aus der Interesse-Liste nur, solange die eigene Freigabe fehlt oder
-	// 'offen' ist, und nur für Personen ohne offene Bewerbung ('angefragt') darauf –
+	// Vergeben aus der Interesse-Liste nur bei offenem Spiel und solange die eigene
+	// Freigabe fehlt oder 'offen' ist, und nur für Personen ohne offene Bewerbung ('angefragt') darauf –
 	// die haben ihren Vergeben-Button bereits in der Freigaben-Liste.
 	// Reine UI-Logik; die Actions prüfen die Berechtigung selbst.
-	const freigabeErlaubtVergabe = !freigabe || freigabe.status === 'offen';
+	const freigabeErlaubtVergabe = spielOffen && (!freigabe || freigabe.status === 'offen');
 	const mitOffenerBewerbung = new Set(
 		freigabe?.status === 'offen'
 			? freigabe.bewerbungen.filter((b) => b.status === 'angefragt').map((b) => b.mitgliedId)
@@ -158,6 +164,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	return {
 		spiel,
+		spielOffen,
 		hasDauerkarte: true as const,
 		freigabe,
 		freigabenFuerSpiel,
@@ -175,7 +182,12 @@ export const actions: Actions = {
 	toggleFreigabe: async ({ params, locals }) => {
 		const { user } = await locals.safeGetSession();
 		if (!user) error(403, 'Nicht angemeldet');
-		await toggleFreigabe(user.id, params.id);
+		try {
+			await toggleFreigabe(user.id, params.id);
+		} catch (e) {
+			// z. B. 409 "Dieses Spiel hat bereits stattgefunden."
+			return alsAktionsFehler(e);
+		}
 	},
 
 	vergeben: async ({ request, locals }) => {
@@ -256,8 +268,9 @@ export const actions: Actions = {
 			error(403, 'Auf die eigene Freigabe kann man sich nicht bewerben');
 		}
 
-		// INSERT nur, wenn die Freigabe aktuell 'offen' ist – als bedingter
-		// INSERT ... SELECT ... WHERE, ohne separates Read-then-Write. Doppelte
+		// INSERT nur, wenn die Freigabe aktuell 'offen' ist und das Spiel noch
+		// nicht stattgefunden hat – als bedingter INSERT ... SELECT ... WHERE, ohne
+		// separates Read-then-Write. Doppelte
 		// Bewerbungen desselben Mitglieds fängt der Unique Constraint
 		// (freigabe_id, mitglied_id) ab (analog zum interesse-Pattern).
 		// `returning id` zeigt, ob wirklich eine Zeile angelegt wurde (postgres-js
@@ -270,12 +283,23 @@ export const actions: Actions = {
 				where exists (
 					select 1 from ${freigaben}
 					where ${freigaben.id} = ${freigabeId}::uuid and ${freigaben.status} = 'offen'
+						and ${spielOffenBedingung(freigaben.spielId)}
 				)
 				returning id
 			`);
 			angelegt = zeilen.length > 0;
 		} catch (e) {
 			if (!istUniqueViolation(e)) throw e;
+		}
+
+		// Nicht angelegt: Liegt es an der Sperre, mit Meldung zurück; sonst (Freigabe
+		// nicht mehr offen, Doppelklick) bleibt es wie bisher ein stiller No-Op.
+		if (!angelegt) {
+			try {
+				await wennGesperrtFehler(zielFreigabe.spielId);
+			} catch (e) {
+				return alsAktionsFehler(e);
+			}
 		}
 
 		// Nur bei neu angelegter Anfrage den Besitzer benachrichtigen.
