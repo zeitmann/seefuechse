@@ -2,6 +2,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import MatchCard from '$lib/components/MatchCard.svelte';
 	import { formatiereUhrzeit } from '$lib/zeit';
+	import { hatErgebnis, heuteDatum } from '$lib/spielAnzeige';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -29,12 +30,15 @@
 	};
 
 	const gefilterteSpiele = $derived.by(() => {
-		const heute = new Date().toISOString().slice(0, 10);
+		const heute = heuteDatum();
+
+		// Ein Spiel mit Endergebnis ist vergangen, auch wenn es heute stattfand.
+		const istVergangen = (s: (typeof data.spiele)[number]) => s.datum < heute || hatErgebnis(s);
 
 		const nachTab =
 			aktiveTab === 'kommend'
-				? data.spiele.filter((s) => s.datum >= heute)
-				: [...data.spiele].filter((s) => s.datum < heute).reverse();
+				? data.spiele.filter((s) => !istVergangen(s))
+				: data.spiele.filter(istVergangen).reverse();
 
 		if (aktiveFilter === 'alle') return nachTab;
 		const erlaubt = wettbewerbMap[aktiveFilter];
@@ -96,6 +100,9 @@
 							heimAuswaerts={spiel.heimAuswaerts}
 							wettbewerb={spiel.wettbewerb}
 							gegner={spiel.gegner}
+							runde={spiel.runde}
+							toreHeimteam={spiel.toreHeimteam}
+							toreGastteam={spiel.toreGastteam}
 							statusBadge={spiel.freeCount > 0 ? `${spiel.freeCount} frei` : undefined}
 						/>
 					</a>

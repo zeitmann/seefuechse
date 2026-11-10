@@ -6,30 +6,23 @@
 	import FehlerHinweis from '$lib/components/FehlerHinweis.svelte';
 	import { mitNeuladenBeiFehler } from '$lib/enhance';
 	import { formatiereUhrzeit } from '$lib/zeit';
+	import {
+		datumGross,
+		datumLang,
+		gastteamName,
+		hatErgebnis,
+		heimteamName,
+		rundeAnzeige
+	} from '$lib/spielAnzeige';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const uhrzeit = $derived(formatiereUhrzeit(data.spiel.uhrzeit));
 	const heimAuswaertsText = $derived(data.spiel.heimAuswaerts === 'heim' ? 'HEIM' : 'AUSWÄRTS');
-
-	function formatDatum(dateStr: string): string {
-		return new Date(dateStr).toLocaleDateString('de-DE', {
-			weekday: 'long',
-			day: '2-digit',
-			month: 'long',
-			year: 'numeric'
-		});
-	}
-
-	function getDay(dateStr: string): string {
-		return new Date(dateStr).getDate().toString().padStart(2, '0');
-	}
-
-	function getMonthShort(dateStr: string): string {
-		const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
-		return months[new Date(dateStr).getMonth()];
-	}
+	const rundeBlock = $derived(rundeAnzeige(data.spiel.runde));
+	const datumBlock = $derived(datumGross(data.spiel.datum));
+	const mitErgebnis = $derived(hatErgebnis(data.spiel));
 
 	const STATUS_LABEL: Record<string, string> = {
 		offen: 'Offen',
@@ -51,8 +44,17 @@
 		<Card>
 			<div class="spiel-hero">
 				<div class="hero-date">
-					<span class="hero-day">{getDay(data.spiel.datum)}</span>
-					<span class="hero-month">{getMonthShort(data.spiel.datum)}</span>
+					{#if rundeBlock}
+						<span class="hero-day" class:runde-text={rundeBlock.klein === null}>
+							{rundeBlock.gross}
+						</span>
+						{#if rundeBlock.klein}
+							<span class="hero-month">{rundeBlock.klein}</span>
+						{/if}
+					{:else}
+						<span class="hero-day">{datumBlock.tag}</span>
+						<span class="hero-month">{datumBlock.monat}</span>
+					{/if}
 				</div>
 				<div class="hero-content">
 					<div class="hero-badges">
@@ -61,7 +63,7 @@
 					</div>
 					<h2 class="hero-gegner">{data.spiel.gegner}</h2>
 					<p class="hero-datum-long">
-						{formatDatum(data.spiel.datum)}{#if uhrzeit}&nbsp;· {uhrzeit} Uhr{/if}
+						{datumLang(data.spiel.datum)}{#if uhrzeit}&nbsp;· {uhrzeit} Uhr{/if}
 						{#if uhrzeit && data.spiel.uhrzeitVorlaeufig}(vorläufig){/if}
 					</p>
 					{#if uhrzeit && data.spiel.uhrzeitVorlaeufig}
@@ -71,6 +73,14 @@
 					{/if}
 				</div>
 			</div>
+			{#if mitErgebnis}
+				<!-- Stadion-Reihenfolge: Heimteam links, Gastteam rechts -->
+				<p class="hero-ergebnis">
+					<span class="ergebnis-team ergebnis-heim">{heimteamName(data.spiel)}</span>
+					<span class="ergebnis-tore">{data.spiel.toreHeimteam} : {data.spiel.toreGastteam}</span>
+					<span class="ergebnis-team">{gastteamName(data.spiel)}</span>
+				</p>
+			{/if}
 		</Card>
 
 		<!-- Dauerkarte-Abschnitt -->
@@ -283,10 +293,51 @@
 		color: var(--color-text);
 	}
 
+	/* Runde ohne Nummer ('Achtelfinale'): kleiner und umbrechbar */
+	.hero-day.runde-text {
+		max-width: 72px;
+		font-family: var(--font-sans);
+		font-size: 13px;
+		line-height: 1.2;
+		text-align: center;
+		hyphens: auto;
+		overflow-wrap: anywhere;
+	}
+
 	.hero-month {
 		font-size: 13px;
 		color: var(--color-text-muted);
 		margin-top: 4px;
+	}
+
+	/* ERGEBNIS */
+	.hero-ergebnis {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+		gap: 12px;
+		margin: 16px 0 0;
+		padding-top: 16px;
+		border-top: 1px solid var(--color-border);
+	}
+
+	.ergebnis-team {
+		min-width: 0;
+		font-size: 14px;
+		font-weight: 600;
+		line-height: 1.3;
+		overflow-wrap: anywhere;
+	}
+
+	.ergebnis-heim {
+		text-align: right;
+	}
+
+	.ergebnis-tore {
+		font-family: var(--font-mono);
+		font-size: 28px;
+		font-weight: 700;
+		white-space: nowrap;
 	}
 
 	.hero-content {

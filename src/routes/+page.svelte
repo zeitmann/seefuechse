@@ -96,6 +96,9 @@
 							heimAuswaerts={spiel.heimAuswaerts}
 							wettbewerb={spiel.wettbewerb}
 							gegner={spiel.gegner}
+							runde={spiel.runde}
+							toreHeimteam={spiel.toreHeimteam}
+							toreGastteam={spiel.toreGastteam}
 							statusBadge={spiel.freeCount > 0 ? `${spiel.freeCount} frei` : undefined}
 						/>
 					</a>

@@ -166,7 +166,7 @@ Rollen werden in der App unter `/verwaltung/rollen` zugewiesen. Die Seite setzt 
 Mockups dazu liegen unter `mockups/`.
 
 - **Start** (`/`) – Dashboard mit Begrüßung, offenen Bewerbungen auf die eigene Karte (falls DK-Besitzer), den nächsten Spielen und allen aktuell club-weit freigegebenen Karten
-- **Spielplan** (`/spielplan`) – alle Spiele der Saison, Tabs Kommende/Vergangene, Filter Liga/Pokal/Europa/Testspiele, zeigt freie Karten je Spiel und kennzeichnet vorläufige Anstoßzeiten; jede Spielkachel verlinkt zur Detailseite
+- **Spielplan** (`/spielplan`) – alle Spiele der Saison, Tabs Kommende/Vergangene, Filter Liga/Pokal/Europa/Testspiele, zeigt freie Karten je Spiel und kennzeichnet vorläufige Anstoßzeiten; jede Spielkachel verlinkt zur Detailseite. Die Kachel zeigt links groß Spieltag bzw. Runde (z. B. „3 Spieltag", „Achtelfinale"; ohne Runde das Datum), daneben Datum und Uhrzeit, und bei beendeten Spielen rechts das Ergebnis in Stadion-Reihenfolge (Heim : Gast). „Vergangene" enthält Spiele vor heute (Europe/Berlin) oder mit Endergebnis, „Kommende" den Rest
 - **Spieldetail** (`/spielplan/[id]`) – ein einzelnes Spiel: eigene Karte freigeben/zurückziehen, Bewerbungen entscheiden, an Interessenten direkt vergeben; Mitglieder können sich bewerben oder Interesse anmelden/zurückziehen
 - **Meine Dauerkarte** (`/karte`) – nur für DK-Besitzer: eigene Dauerkarte je kommendem Spiel freigeben/behalten, Bewerbungen einsehen und vergeben, Anzahl Interessenten je Spiel
 - **Anfragen** (`/anfragen`) – für alle Mitglieder: eigene Interesse-Anmeldungen und Bewerbungen (zurückziehbar), für DK-Besitzer zusätzlich eigene offene Freigaben mit Bewerberliste

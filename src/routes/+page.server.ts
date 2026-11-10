@@ -1,6 +1,7 @@
 import { db } from '$lib/server/db';
 import { mitglieder, spiele, freigaben } from '$lib/server/db/schema';
-import { eq, gte, asc } from 'drizzle-orm';
+import { and, eq, gte, asc, isNull } from 'drizzle-orm';
+import { heuteDatum } from '$lib/spielAnzeige';
 import {
 	ermittleTerminierungsStichtag,
 	mitUhrzeitVorlaeufig
@@ -29,11 +30,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const eigeneDauerkartenIds = (eigenesMitglied?.dauerkarten ?? []).map((dk) => dk.id);
 	const meineDauerkarte = eigenesMitglied?.dauerkarten?.[0] ?? null;
 
-	const heute = new Date().toISOString().slice(0, 10);
+	const heute = heuteDatum();
 
 	const [naechsteSpieleRaw, stichtag] = await Promise.all([
 		db.query.spiele.findMany({
-			where: gte(spiele.datum, heute),
+			// Wie der Tab "Kommende": ab heute (Berlin) und noch ohne Endergebnis.
+			// Die Tore sind per CHECK beide gesetzt oder beide null.
+			where: and(gte(spiele.datum, heute), isNull(spiele.toreHeimteam)),
 			// Nach Datum, dann Anpfiff; Postgres sortiert NULL bei ASC zuletzt (ohne Uhrzeit hinten).
 			orderBy: [asc(spiele.datum), asc(spiele.uhrzeit)],
 			limit: 3
