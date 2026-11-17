@@ -267,6 +267,17 @@ export const syncLaeufe = pgTable('sync_laeufe', {
 	hinweise: text('hinweise')
 });
 
+/**
+ * App-weite Einstellungen als Schlüssel-Wert-Paare (z. B. 'sync_intervall').
+ * Nur Abbild der manuell angelegten DB-Tabelle (RLS aktiviert); Zugriff
+ * ausschließlich serverseitig über Drizzle.
+ */
+export const einstellungen = pgTable('einstellungen', {
+	schluessel: text('schluessel').primaryKey(),
+	wert: text('wert').notNull(),
+	geaendertAm: timestamp('geaendert_am', { withTimezone: true }).notNull().defaultNow()
+});
+
 // --- Relations: ermöglichen komfortable Queries mit db.query.x.findMany({ with: {...} }) ---
 
 export const mitgliederRelations = relations(mitglieder, ({ many }) => ({

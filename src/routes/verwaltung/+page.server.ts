@@ -6,6 +6,13 @@ import { hatVerwaltungsRolle, hatAdminRolle } from '$lib/server/rollen';
 import { AKTUELLE_SAISON, fuehreSyncMitProtokollAus } from '$lib/server/spielplanSync';
 import { ermittleTerminierungsStichtag } from '$lib/server/spielplanTermine';
 import {
+	holeSyncIntervall,
+	istSyncIntervall,
+	setzeSyncIntervall,
+	STANDARD_SYNC_INTERVALL,
+	type SyncIntervall
+} from '$lib/server/syncEinstellung';
+import {
 	dauerkartenUebersicht,
 	dauerkarteEntfernen,
 	type DauerkartenEintrag
@@ -22,6 +29,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			terminierungsStichtag: null,
 			letzterSync: null,
 			syncSaison: AKTUELLE_SAISON,
+			syncIntervall: STANDARD_SYNC_INTERVALL as SyncIntervall,
 			istAdmin: false,
 			ausstehendeMitglieder: [] as { id: string; name: string; email: string }[],
 			dauerkarten: [] as DauerkartenEintrag[]
@@ -35,7 +43,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(mitglieder)
 		.where(eq(mitglieder.status, 'ausstehend'));
 
-	const [terminierungsStichtag, [letzterSync], dauerkarten] = await Promise.all([
+	const [terminierungsStichtag, [letzterSync], dauerkarten, syncIntervall] = await Promise.all([
 		ermittleTerminierungsStichtag(),
 		db
 			.select({
@@ -47,7 +55,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.from(syncLaeufe)
 			.orderBy(desc(syncLaeufe.gestartetAm))
 			.limit(1),
-		dauerkartenUebersicht()
+		dauerkartenUebersicht(),
+		holeSyncIntervall()
 	]);
 
 	return {
@@ -57,6 +66,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		terminierungsStichtag,
 		letzterSync: letzterSync ?? null,
 		syncSaison: AKTUELLE_SAISON,
+		syncIntervall,
 		dauerkarten
 	};
 };
@@ -75,6 +85,23 @@ export const actions: Actions = {
 		// Wirft nicht; Fehler landen als erfolgreich = false im Protokoll und Ergebnis.
 		const sync = await fuehreSyncMitProtokollAus('manuell');
 		return { sync };
+	},
+
+	/** Legt fest, wie oft der automatische Sync (Cron) tatsächlich synchronisiert. */
+	syncIntervallSetzen: async ({ request, locals }) => {
+		const { user } = await locals.safeGetSession();
+		if (!user || !(await hatVerwaltungsRolle(user.id))) {
+			error(403, 'Keine Berechtigung');
+		}
+
+		const form = await request.formData();
+		const intervall = form.get('intervall');
+		if (!istSyncIntervall(intervall)) {
+			return fail(400, { intervallFehler: 'Ungültiges Intervall' });
+		}
+
+		await setzeSyncIntervall(intervall);
+		return { intervallGespeichert: true };
 	},
 
 	freischalten: async ({ request, locals }) => {

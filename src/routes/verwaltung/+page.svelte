@@ -44,6 +44,9 @@
 				terminierungsStichtag={data.terminierungsStichtag}
 				letzterSync={data.letzterSync}
 				saison={data.syncSaison}
+				syncIntervall={data.syncIntervall}
+				intervallGespeichert={form?.intervallGespeichert ?? false}
+				intervallFehler={form?.intervallFehler ?? null}
 			/>
 
 			<!-- Ausstehende Freischaltungen (nur für Admin/Vorstand) -->

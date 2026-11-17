@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { fuehreSyncMitProtokollAus } from '$lib/server/spielplanSync';
+import { sollAutomatischSynchronisieren } from '$lib/server/syncEinstellung';
 import type { RequestHandler } from './$types';
 
 /**
@@ -26,6 +27,11 @@ async function sindGleich(a: string, b: string): Promise<boolean> {
  * Wird von der Netlify Scheduled Function aufgerufen (04:00 UTC und stündlich 12–23 UTC). Statt einer
  * Anmeldung schützt ein Bearer-Token (CRON_SECRET); der Login-Guard in
  * hooks.server.ts nimmt genau diesen Pfad aus. Nur POST (andere Methoden: 405).
+ *
+ * Ob tatsächlich synchronisiert wird, entscheidet die Einstellung 'sync_intervall'
+ * (siehe syncEinstellung.ts). Bei Pause oder zu kurzem Abstand zum letzten
+ * Cron-Lauf: kein Sync, kein Eintrag in sync_laeufe, Antwort 200 mit
+ * { uebersprungen: 'pause' | 'intervall' }.
  */
 export const POST: RequestHandler = async ({ request }) => {
 	const geheimnis = env.CRON_SECRET;
@@ -37,6 +43,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	const kopf = request.headers.get('authorization') ?? '';
 	if (!(await sindGleich(kopf, `Bearer ${geheimnis}`))) {
 		return json({ fehler: 'Nicht autorisiert.' }, { status: 401 });
+	}
+
+	const entscheidung = await sollAutomatischSynchronisieren();
+	if (!entscheidung.laufen) {
+		return json({ uebersprungen: entscheidung.grund });
 	}
 
 	const ergebnis = await fuehreSyncMitProtokollAus('cron');

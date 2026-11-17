@@ -29,6 +29,11 @@ export default async () => {
 		let kurzergebnis = text.slice(0, 300);
 		try {
 			const e = JSON.parse(text);
+			// Endpoint hat laut Einstellung 'sync_intervall' nicht synchronisiert
+			if (e.uebersprungen) {
+				console.log(`Spielplan-Sync: HTTP ${antwort.status} Sync übersprungen: ${e.uebersprungen}`);
+				return;
+			}
 			kurzergebnis = JSON.stringify({
 				erfolgreich: e.erfolgreich,
 				neu: e.neu,

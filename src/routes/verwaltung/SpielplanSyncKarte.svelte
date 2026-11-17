@@ -4,6 +4,12 @@
 	import { RefreshCw } from '@lucide/svelte';
 	import { formatiereZeitpunkt } from '$lib/zeit';
 	import type { SyncErgebnis } from '$lib/server/spielplanSync';
+	import {
+		SYNC_INTERVALLE,
+		SYNC_INTERVALL_HINWEISE,
+		SYNC_INTERVALL_LABELS,
+		type SyncIntervall
+	} from '$lib/syncIntervall';
 
 	type LetzterSync = {
 		gestartetAm: Date;
@@ -16,13 +22,38 @@
 		ergebnis,
 		terminierungsStichtag,
 		letzterSync,
-		saison
+		saison,
+		syncIntervall,
+		intervallGespeichert,
+		intervallFehler
 	}: {
 		ergebnis: SyncErgebnis | null;
 		terminierungsStichtag: string | null;
 		letzterSync: LetzterSync | null;
 		saison: number;
+		syncIntervall: SyncIntervall;
+		intervallGespeichert: boolean;
+		intervallFehler: string | null;
 	} = $props();
+
+	// Aktuelle Auswahl im Select: folgt dem Server-Wert (nach invalidateAll),
+	// wird beim Ändern lokal überschrieben, damit Hinweis und Pause-Warnung
+	// sofort passen.
+	let auswahl = $derived(syncIntervall);
+	let intervallSpeichert = $state(false);
+
+	const intervallAbsenden: SubmitFunction = () => {
+		intervallSpeichert = true;
+		return async ({ result, update }) => {
+			try {
+				await update({ reset: false });
+			} finally {
+				intervallSpeichert = false;
+				// Bei Fehler zurück auf den gespeicherten Wert
+				if (result.type !== 'success') auswahl = syncIntervall;
+			}
+		};
+	};
 
 	// 2026 → '2026/27'
 	const saisonText = $derived(`${saison}/${String((saison + 1) % 100).padStart(2, '0')}`);
@@ -91,6 +122,48 @@
 			{/if}
 		</div>
 	{/if}
+
+	<div class="intervall-bereich">
+		<form
+			method="POST"
+			action="?/syncIntervallSetzen"
+			class="intervall-form"
+			use:enhance={intervallAbsenden}
+		>
+			<label class="intervall-zeile">
+				<span class="intervall-label">Automatischer Sync</span>
+				<select
+					class="intervall-select"
+					name="intervall"
+					bind:value={auswahl}
+					aria-busy={intervallSpeichert}
+					onchange={(e) => e.currentTarget.form?.requestSubmit()}
+				>
+					{#each SYNC_INTERVALLE as intervall (intervall)}
+						<option value={intervall}>{SYNC_INTERVALL_LABELS[intervall]}</option>
+					{/each}
+				</select>
+			</label>
+		</form>
+
+		<p class="intervall-hinweis">{SYNC_INTERVALL_HINWEISE[auswahl]}</p>
+
+		{#if auswahl === 'pause'}
+			<div class="sync-warnung" role="alert">
+				<p class="warnung-titel">Automatischer Sync pausiert</p>
+				<p class="warnung-text">
+					Spielplan, Ergebnisse und Anstoßzeiten werden nicht mehr aktualisiert. Der Button
+					„Jetzt synchronisieren“ funktioniert weiterhin.
+				</p>
+			</div>
+		{/if}
+
+		{#if intervallFehler && !intervallSpeichert}
+			<p class="intervall-meldung intervall-fehler" role="alert">{intervallFehler}</p>
+		{:else if intervallGespeichert && !intervallSpeichert}
+			<p class="intervall-meldung" role="status">Gespeichert</p>
+		{/if}
+	</div>
 
 	<p class="status-zeile">
 		Anstoßzeiten bestätigt bis: <strong>{stichtagText}</strong>
@@ -226,8 +299,75 @@
 		white-space: pre-line;
 	}
 
+	.warnung-text {
+		margin-top: 2px;
+		color: var(--color-text);
+	}
+
 	form {
 		margin: 0;
+	}
+
+	.intervall-bereich {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-top: 12px;
+		border-top: 1px solid var(--color-border);
+	}
+
+	.intervall-zeile {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+
+	.intervall-label {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--color-text);
+	}
+
+	.intervall-select {
+		flex-shrink: 0;
+		min-width: 0;
+		max-width: 60%;
+		padding: 8px 10px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+		background: var(--color-bg);
+		color: var(--color-text);
+		/* 16px verhindert das automatische Zoomen in iOS Safari */
+		font-size: 16px;
+		font-family: inherit;
+	}
+
+	.intervall-select:focus {
+		outline: none;
+		border-color: var(--color-accent);
+	}
+
+	.intervall-select[aria-busy='true'] {
+		opacity: 0.7;
+		cursor: progress;
+	}
+
+	.intervall-hinweis {
+		margin: 0;
+		font-size: 12px;
+		color: var(--color-text-muted);
+	}
+
+	.intervall-meldung {
+		margin: 0;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--color-success);
+	}
+
+	.intervall-meldung.intervall-fehler {
+		color: var(--color-accent);
 	}
 
 	.btn-sync {
